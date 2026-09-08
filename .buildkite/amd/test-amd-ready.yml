@@ -127,9 +127,12 @@ steps:
       mirror_hardwares: [amdproduction]
       grade: Blocking
       commands:
+        # Preserve legacy one-GPU tests without cards_1 while excluding every
+        # registered multi-GPU marker from this one-GPU job.
         - >-
           timeout 15m pytest -sv tests/diffusion/models/
-          -m 'core_model and cuda and not cards_2'
+          -m 'core_model and cuda and not
+          (cards_2 or cards_3 or cards_4 or cards_5 or cards_6 or cards_7 or cards_8)'
           --run-level "core_model"
 
     - label: "Diffusion · Wan22 Test"

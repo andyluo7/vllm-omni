@@ -54,12 +54,15 @@ def test_r2_01_fails_closed_and_publishes_collection_and_results() -> None:
     commands = _find_step(R2_01_LABEL)["commands"]
     collect_command = next(command for command in commands if "--collect-only" in command)
     run_command = next(command for command in commands if "--junitxml" in command)
+    artifact_dir = "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-r2-01"
 
     _assert_single_gpu_selection(collect_command)
     _assert_single_gpu_selection(run_command)
     assert "VLLM_CI_ALLOW_NO_TESTS" not in "\n".join(commands)
-    assert "collected-nodeids.txt" in collect_command
+    assert any(artifact_dir in command for command in commands)
+    assert "$$R2_01_ARTIFACT_DIR/collected-nodeids.txt" in collect_command
     assert "-ra" in split(run_command)
     assert "--durations=0" in split(run_command)
-    assert "--junitxml=artifacts/rocm-r2-01/pytest.xml" in split(run_command)
-    assert any("pytest-summary.txt" in command for command in commands)
+    assert "--junitxml=$$R2_01_ARTIFACT_DIR/pytest.xml" in split(run_command)
+    assert "$$R2_01_ARTIFACT_DIR/pytest.log" in run_command
+    assert any("$$R2_01_ARTIFACT_DIR/pytest-summary.txt" in command for command in commands)

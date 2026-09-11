@@ -21,6 +21,12 @@ def _docker_arg(path: Path, name: str) -> str:
     return matches[0]
 
 
+def _line_index(lines: list[str], prefix: str) -> int:
+    matches = [index for index, line in enumerate(lines) if line.startswith(prefix)]
+    assert len(matches) == 1, f"expected one line starting with {prefix!r}, found {len(matches)}"
+    return matches[0]
+
+
 def test_rocm_base_tracks_ci_vllm_release() -> None:
     ci_release = _docker_arg(CI_DOCKERFILE, "VLLM_BASE_TAG")
     rocm_base = _docker_arg(ROCM_DOCKERFILE, "BASE_IMAGE")
@@ -31,7 +37,11 @@ def test_rocm_base_tracks_ci_vllm_release() -> None:
     assert image_tag == ci_release
 
 
-def test_rocm_nightly_source_ref_tracks_ci_vllm_release() -> None:
+def test_rocm_defaults_to_prebuilt_base_image() -> None:
+    assert _docker_arg(ROCM_DOCKERFILE, "USE_NIGHTLY_BUILD") == "0"
+
+
+def test_rocm_source_ref_tracks_ci_vllm_release() -> None:
     ci_release = _docker_arg(CI_DOCKERFILE, "VLLM_BASE_TAG")
     rocm_source_ref = _docker_arg(ROCM_DOCKERFILE, "VLLM_VERSION_OR_COMMIT_HASH")
 
@@ -40,10 +50,15 @@ def test_rocm_nightly_source_ref_tracks_ci_vllm_release() -> None:
 
 def test_rocm_dockerfile_contains_vllm_api_canary() -> None:
     dockerfile = ROCM_DOCKERFILE.read_text(encoding="utf-8")
+    lines = dockerfile.splitlines()
+    nightly_start = _line_index(lines, 'RUN if [ "${USE_NIGHTLY_BUILD}" = "1" ]; then')
     canary = (
         'RUN python3 -c "import vllm; '
         "from vllm.v1.kv_cache_interface import compute_layout_strides; "
         "from vllm.v1.kv_cache_layout import KVCacheLayout;"
     )
+    canary_index = _line_index(lines, canary)
 
-    assert any(line.startswith(canary) for line in dockerfile.splitlines())
+    assert any(line.strip() == "fi" for line in lines[nightly_start + 1 : canary_index]), (
+        "vLLM API canary must follow the optional nightly source reinstall block"
+    )

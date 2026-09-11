@@ -7,8 +7,9 @@ import pytest
 
 pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
 
-CUDA_DOCKERFILE = Path("docker/Dockerfile.ci")
-ROCM_DOCKERFILE = Path("docker/Dockerfile.rocm")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CI_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.ci"
+ROCM_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.rocm"
 
 
 def _docker_arg(path: Path, name: str) -> str:
@@ -20,16 +21,17 @@ def _docker_arg(path: Path, name: str) -> str:
     return matches[0]
 
 
-def test_rocm_base_tracks_cuda_vllm_release() -> None:
-    cuda_release = _docker_arg(CUDA_DOCKERFILE, "VLLM_BASE_TAG")
+def test_rocm_base_tracks_ci_vllm_release() -> None:
+    ci_release = _docker_arg(CI_DOCKERFILE, "VLLM_BASE_TAG")
     rocm_base = _docker_arg(ROCM_DOCKERFILE, "BASE_IMAGE")
     rocm_source_ref = _docker_arg(ROCM_DOCKERFILE, "VLLM_VERSION_OR_COMMIT_HASH")
 
-    assert rocm_base.rsplit(":", 1)[-1] == cuda_release
-    assert rocm_source_ref == cuda_release
+    assert rocm_base.rsplit(":", 1)[-1] == ci_release
+    assert rocm_source_ref == ci_release
 
 
 def test_rocm_image_fails_fast_on_missing_vllm_api() -> None:
     dockerfile = ROCM_DOCKERFILE.read_text(encoding="utf-8")
+    canary = 'RUN python3 -c "import vllm; from vllm.v1.kv_cache_interface import compute_layout_strides;'
 
-    assert "from vllm.v1.kv_cache_interface import compute_layout_strides" in dockerfile
+    assert any(line.startswith(canary) for line in dockerfile.splitlines())

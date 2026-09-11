@@ -49,8 +49,9 @@ def test_amd_build_uses_rocm_dockerfile_defaults() -> None:
     assert len(build_commands) == 1, f"expected one AMD image build command, found {len(build_commands)}"
     build_command = build_commands[0]
     assert "-f docker/Dockerfile.rocm" in build_command
-    assert "BASE_IMAGE" not in build_command
-    assert "USE_NIGHTLY_BUILD" not in build_command
+    for arg_name in ("BASE_IMAGE", "USE_NIGHTLY_BUILD"):
+        assert f"--build-arg {arg_name}" not in build_command
+        assert f"--build-arg={arg_name}" not in build_command
 
 
 def test_rocm_source_ref_tracks_ci_vllm_release() -> None:

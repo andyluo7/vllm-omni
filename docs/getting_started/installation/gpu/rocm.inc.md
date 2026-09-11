@@ -8,7 +8,16 @@
 
 # --8<-- [start:set-up-using-python]
 
-vLLM-Omni current recommends the steps in under setup through Docker Images.
+For ROCm, vLLM-Omni currently recommends the setup steps through Docker Images.
+
+vLLM-Omni depends on the matching major/minor release of vLLM. The 0.29
+development line uses vLLM 0.29.x. Published 0.28.0 wheels and images use vLLM
+0.28.x.
+
+The Dockerfile's `BASE_IMAGE` pin applies only to Docker builds. The
+`vllm-omni` package does not install vLLM as a dependency, so non-Docker source
+installs must install the matching ROCm vLLM release explicitly before
+installing vLLM-Omni, as shown below.
 
 # --8<-- [start:pre-built-wheels]
 

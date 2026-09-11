@@ -5,12 +5,12 @@ ARG BASE_IMAGE=vllm/vllm-openai-rocm:v0.29.0
 FROM ${BASE_IMAGE} AS base
 
 # NOTE: REMINDER to vLLM-Omni rebase maintainer
-# Keep the BASE_IMAGE tag and VLLM_VERSION_OR_COMMIT_HASH aligned with
-# docker/Dockerfile.ci's VLLM_BASE_TAG. This is enforced by
-# tests/buildkite/test_rocm_dockerfile.py. An intentional custom source pin
-# must update that regression in the same change. Keep USE_NIGHTLY_BUILD=0
-# when using the stable vLLM image, and return to the stable release as soon as
-# one is available.
+# BASE_IMAGE pins the default prebuilt runtime when USE_NIGHTLY_BUILD=0.
+# VLLM_VERSION_OR_COMMIT_HASH is consumed only by the opt-in source rebuild when
+# USE_NIGHTLY_BUILD=1. Keep both aligned with docker/Dockerfile.ci's
+# VLLM_BASE_TAG. This is enforced by tests/buildkite/test_rocm_dockerfile.py. An
+# intentional custom source pin must update that regression in the same change,
+# and should return to the stable release as soon as one is available.
 ARG USE_NIGHTLY_BUILD=0
 ARG VLLM_VERSION_OR_COMMIT_HASH=v0.29.0
 ARG ARG_PYTORCH_ROCM_ARCH

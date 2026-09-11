@@ -165,6 +165,7 @@ steps:
   depends_on: amd-build
   mirror_hardwares: [amdproduction]
   grade: NonBlocking
+  timeout_in_minutes: 20
   artifact_paths:
     - "artifacts/rocm-r2-01/**/*"
   commands:

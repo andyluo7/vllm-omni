@@ -46,6 +46,7 @@ def test_r2_01_is_nonblocking_single_gpu_coverage() -> None:
 
     assert step["agent_pool"] == "mi300_1"
     assert step["grade"] == "NonBlocking"
+    assert step["timeout_in_minutes"] == 20
     assert step["mirror_hardwares"] == ["amdproduction"]
     assert step["artifact_paths"] == ["artifacts/rocm-r2-01/**/*"]
 

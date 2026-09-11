@@ -39,10 +39,10 @@ steps:
           # Native tests run from the image copy under /app/vllm-omni, while
           # Buildkite's artifact hook searches the checkout workspace.
           - |
-            if [[ "$PWD" != "${BUILDKITE_BUILD_CHECKOUT_PATH:?}" ]]; then
-              artifact_dir="${BUILDKITE_BUILD_CHECKOUT_PATH}/tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc"
-              mkdir -p "$artifact_dir"
-              cp -v tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json "$artifact_dir/"
+            if [[ "$$PWD" != "$${BUILDKITE_BUILD_CHECKOUT_PATH:?}" ]]; then
+              artifact_dir="$${BUILDKITE_BUILD_CHECKOUT_PATH}/tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc"
+              mkdir -p "$$artifact_dir"
+              cp -v tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json "$$artifact_dir/"
             fi
 
       - label: "Qwen3-Omni Documentation Examples"

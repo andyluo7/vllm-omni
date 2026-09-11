@@ -43,7 +43,7 @@ RUN if [ "${USE_NIGHTLY_BUILD}" = "1" ]; then \
 
 # Fail during image construction instead of letting every AMD test fail at
 # runtime when the base image and vLLM-Omni target incompatible vLLM APIs.
-RUN python3 -c "import vllm; from vllm.v1.kv_cache_interface import compute_layout_strides; print(f'Validated vLLM {vllm.__version__}')"
+RUN python3 -c "import vllm; from vllm.v1.kv_cache_interface import compute_layout_strides; from vllm.v1.kv_cache_layout import KVCacheLayout; print(f'Validated vLLM {vllm.__version__}')"
 
 # Build TorchCodec after any optional nightly vLLM reinstall so it targets the
 # final torch/ROCm ABI. Keep this layer before COPY . so source changes do not

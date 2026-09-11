@@ -8,6 +8,7 @@ import pytest
 pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+AMD_TEMPLATE = REPO_ROOT / ".buildkite/amd/test-template-amd-omni.j2"
 CI_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.ci"
 ROCM_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.rocm"
 
@@ -39,6 +40,17 @@ def test_rocm_base_tracks_ci_vllm_release() -> None:
 
 def test_rocm_defaults_to_prebuilt_base_image() -> None:
     assert _docker_arg(ROCM_DOCKERFILE, "USE_NIGHTLY_BUILD") == "0"
+
+
+def test_amd_build_uses_rocm_dockerfile_defaults() -> None:
+    template = AMD_TEMPLATE.read_text(encoding="utf-8")
+    build_commands = [line.strip() for line in template.splitlines() if '"docker build ' in line]
+
+    assert len(build_commands) == 1, f"expected one AMD image build command, found {len(build_commands)}"
+    build_command = build_commands[0]
+    assert "-f docker/Dockerfile.rocm" in build_command
+    assert "BASE_IMAGE" not in build_command
+    assert "USE_NIGHTLY_BUILD" not in build_command
 
 
 def test_rocm_source_ref_tracks_ci_vllm_release() -> None:

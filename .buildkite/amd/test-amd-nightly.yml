@@ -36,6 +36,14 @@ steps:
           # PyTorch ROCm uses the torch.cuda device namespace.
           - export SEED_TTS_EVAL_DEVICE=cuda:1
           - pytest -s -v tests/e2e/accuracy/qwen3_omni/test_qwen3_omni.py -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
+          # Native tests run from the image copy under /app/vllm-omni, while
+          # Buildkite's artifact hook searches the checkout workspace.
+          - |
+            if [[ "$PWD" != "${BUILDKITE_BUILD_CHECKOUT_PATH:?}" ]]; then
+              artifact_dir="${BUILDKITE_BUILD_CHECKOUT_PATH}/tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc"
+              mkdir -p "$artifact_dir"
+              cp -v tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json "$artifact_dir/"
+            fi
 
       - label: "Qwen3-Omni Documentation Examples"
         agent_pool: mi300_2

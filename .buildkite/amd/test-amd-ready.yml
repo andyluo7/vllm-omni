@@ -177,11 +177,14 @@ steps:
     # Keep the initial ROCm burn-in scoped to the requested directories.
     # Verbose pytest output and JUnit retain node IDs without a second
     # collection-only pass over the same GPU-backed test tree.
+    # The CUDA/L4-only CosyVoice3 ragged-flow parity test cold-JITs multiple
+    # AITER kernels on ROCm and is covered by the CUDA ready lane.
     - >-
       pytest -s -v -ra
       tests/engine/ tests/model_executor/
       -m 'core_model and cuda and not
       (cards_2 or cards_3 or cards_4 or cards_5 or cards_6 or cards_7 or cards_8)'
+      -k 'not test_code2wav_streaming_batch_matches_ragged_flow_numerics'
       --run-level "core_model"
       --durations=0
       --junitxml="$$R2_01_ARTIFACT_DIR/pytest.xml"

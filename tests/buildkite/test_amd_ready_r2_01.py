@@ -14,6 +14,7 @@ R2_01_LABEL = "ROCm · Engine & Model Executor GPU Coverage (R2-01)"
 SINGLE_GPU_MARKERS = (
     "core_model and cuda and not (cards_2 or cards_3 or cards_4 or cards_5 or cards_6 or cards_7 or cards_8)"
 )
+EXCLUDED_TEST = "test_code2wav_streaming_batch_matches_ragged_flow_numerics"
 
 
 def _find_step(label: str) -> dict:
@@ -38,6 +39,7 @@ def _assert_single_gpu_selection(command: str) -> None:
     assert "tests/model_executor/" in argv
     assert "tests/worker/test_batched_omni_output.py" not in argv
     assert argv[argv.index("-m") + 1] == SINGLE_GPU_MARKERS
+    assert argv[argv.index("-k") + 1] == f"not {EXCLUDED_TEST}"
     assert argv[argv.index("--run-level") + 1] == "core_model"
 
 

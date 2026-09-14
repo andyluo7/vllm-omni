@@ -51,17 +51,18 @@ def test_r2_01_is_nonblocking_single_gpu_coverage() -> None:
     assert step["artifact_paths"] == ["artifacts/rocm-r2-01/**/*"]
 
 
-def test_r2_01_fails_closed_and_publishes_collection_and_results() -> None:
+def test_r2_01_runs_once_fails_closed_and_publishes_results() -> None:
     commands = _find_step(R2_01_LABEL)["commands"]
-    collect_command = next(command for command in commands if "--collect-only" in command)
-    run_command = next(command for command in commands if "--junitxml" in command)
+    pytest_commands = [command for command in commands if command.lstrip().startswith("pytest ")]
+    assert len(pytest_commands) == 1
+    run_command = pytest_commands[0]
     artifact_dir = "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-r2-01"
 
-    _assert_single_gpu_selection(collect_command)
     _assert_single_gpu_selection(run_command)
+    assert "--collect-only" not in "\n".join(commands)
     assert "VLLM_CI_ALLOW_NO_TESTS" not in "\n".join(commands)
     assert any(artifact_dir in command for command in commands)
-    assert "$$R2_01_ARTIFACT_DIR/collected-nodeids.txt" in collect_command
+    assert "-v" in split(run_command)
     assert "-ra" in split(run_command)
     assert "--durations=0" in split(run_command)
     assert "--junitxml=$$R2_01_ARTIFACT_DIR/pytest.xml" in split(run_command)

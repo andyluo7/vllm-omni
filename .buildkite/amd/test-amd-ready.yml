@@ -175,15 +175,10 @@ steps:
     - mkdir -p "$$R2_01_ARTIFACT_DIR"
     # The CUDA ready job also covers tests/worker/test_batched_omni_output.py.
     # Keep the initial ROCm burn-in scoped to the requested directories.
+    # Verbose pytest output and JUnit retain node IDs without a second
+    # collection-only pass over the same GPU-backed test tree.
     - >-
-      pytest --collect-only -q
-      tests/engine/ tests/model_executor/
-      -m 'core_model and cuda and not
-      (cards_2 or cards_3 or cards_4 or cards_5 or cards_6 or cards_7 or cards_8)'
-      --run-level "core_model"
-      2>&1 | tee "$$R2_01_ARTIFACT_DIR/collected-nodeids.txt"
-    - >-
-      pytest -sv -ra
+      pytest -s -v -ra
       tests/engine/ tests/model_executor/
       -m 'core_model and cuda and not
       (cards_2 or cards_3 or cards_4 or cards_5 or cards_6 or cards_7 or cards_8)'

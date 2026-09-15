@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vllm-project/vllm-omni/blob/main/.buildkite/ci/rocm_cuda_parity.schema.json",
+  "title": "vLLM-Omni CUDA/ROCm CI parity ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "issue", "snapshot", "rows"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "issue": {"const": "https://github.com/vllm-project/vllm-omni/issues/5731"},
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upstream_sha", "recorded_at", "owner"],
+      "properties": {
+        "upstream_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "recorded_at": {"type": "string", "format": "date"},
+        "owner": {"type": "string", "minLength": 1}
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 61,
+      "maxItems": 61,
+      "items": {"$ref": "#/$defs/row"}
+    }
+  },
+  "$defs": {
+    "nullableString": {"type": ["string", "null"]},
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue_item",
+        "id",
+        "title",
+        "cuda_source",
+        "cuda_command",
+        "rocm_suite",
+        "rocm_queue",
+        "gpu_count",
+        "status",
+        "owner",
+        "planned_pr",
+        "pr",
+        "head_sha",
+        "builds",
+        "artifacts",
+        "resolution"
+      ],
+      "properties": {
+        "issue_item": {"type": "integer", "minimum": 1, "maximum": 61},
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "title": {"type": "string", "minLength": 1},
+        "cuda_source": {"type": "string", "minLength": 1},
+        "cuda_command": {"type": "string", "minLength": 1},
+        "rocm_suite": {"$ref": "#/$defs/nullableString"},
+        "rocm_queue": {"enum": ["mi300_1", "mi300_2", "mi300_4", null]},
+        "gpu_count": {"type": ["integer", "null"], "minimum": 1, "maximum": 8},
+        "status": {
+          "enum": [
+            "covered",
+            "stale-reference",
+            "duplicate",
+            "approved-exception",
+            "cuda-only",
+            "missing",
+            "partial",
+            "unknown"
+          ]
+        },
+        "owner": {"type": "string", "minLength": 1},
+        "planned_pr": {"$ref": "#/$defs/nullableString"},
+        "pr": {"type": ["integer", "null"], "minimum": 1},
+        "head_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "builds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["number", "url", "named_job", "state", "soft_failed"],
+            "properties": {
+              "number": {"type": "integer", "minimum": 1},
+              "url": {"type": "string", "format": "uri"},
+              "named_job": {"type": "string", "minLength": 1},
+              "state": {"enum": ["passed", "failed", "canceled", "running", "scheduled"]},
+              "soft_failed": {"type": "boolean"}
+            }
+          }
+        },
+        "artifacts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "resolution": {"$ref": "#/$defs/nullableString"}
+      }
+    }
+  }
+}

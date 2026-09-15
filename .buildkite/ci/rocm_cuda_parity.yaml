@@ -1,0 +1,983 @@
+schema_version: 1
+issue: "https://github.com/vllm-project/vllm-omni/issues/5731"
+snapshot:
+  upstream_sha: "78934753ff7e092b24ada0e34062cf3d121efd25"
+  recorded_at: "2026-09-15"
+  owner: "andyluo7"
+rows:
+  - issue_item: 1
+    id: "entrypoint-gpu"
+    title: "Entrypoint Test with MI300/MI325"
+    cuda_source: ".buildkite/cuda/test-merge.yml"
+    cuda_command: "pytest -sv tests/entrypoints/ -m 'advanced_model and cuda'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "partial"
+    owner: "andyluo7"
+    planned_pr: "#7398"
+    pr: 7398
+    head_sha: "6177ec236f81470564c456a4faf6a8a357697751"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 2
+    id: "distributed-core"
+    title: "tests/distributed/ core-model GPU coverage"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -sv tests/distributed/ -m 'core_model and cuda and L4'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "#7605"
+    pr: 7605
+    head_sha: "c2293eb9149c3ec8e9135c618ab3c991218767ac"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 3
+    id: "tiny-diffusion-base"
+    title: "Tiny Model Tests - Diffusion base"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -sv -n 4 tests/model_tests/diffusion -m 'core_model and cuda'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "#7605"
+    pr: 7605
+    head_sha: "c2293eb9149c3ec8e9135c618ab3c991218767ac"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 4
+    id: "tiny-diffusion-multigpu"
+    title: "Tiny Model Tests - Diffusion multi-GPU accelerations"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -sv tests/model_tests/diffusion -m 'full_model and L4 and B200 and cuda and cards_2/cards_4'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "#7606"
+    pr: 7606
+    head_sha: "a2816228a83b6040d73c38ca0bee6c3c31445b80"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 5
+    id: "verl-omni-e2e"
+    title: "VeRL-Omni E2E Test"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -s -v tests/e2e/features/rlhf_test/test_verl_omni_e2e.py"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-05"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 6
+    id: "diffusion-quant-h100"
+    title: "Diffusion quantization H100-class scope"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -sv tests/diffusion/quantization -m 'full_model and cuda and H100 and B200 and cards_1'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "#7606"
+    pr: 7606
+    head_sha: "a2816228a83b6040d73c38ca0bee6c3c31445b80"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 7
+    id: "diffusion-quant-l4"
+    title: "Diffusion quantization legacy L4 scope"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pip install vllm-gguf-plugin==0.0.4 && pytest -sv tests/diffusion/quantization -m 'full_model and cuda and L4 and B200 and cards_1'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "#7606"
+    pr: 7606
+    head_sha: "a2816228a83b6040d73c38ca0bee6c3c31445b80"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 8
+    id: "minicpmo-offline"
+    title: "MiniCPM-o 4.5 offline test"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -s -v tests/e2e/offline_inference/test_minicpmo_4_5.py -m 'core_model'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-07"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 9
+    id: "minicpmo-online"
+    title: "MiniCPM-o 4.5 online test"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -s -v tests/e2e/online_serving/test_minicpmo_4_5.py -m 'core_model'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-07"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 10
+    id: "minicpmo-duplex"
+    title: "MiniCPM-o 4.5 duplex test"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest -s -v tests/e2e/online_serving/test_minicpmo_4_5_duplex.py tests/e2e/online_serving/test_duplex_client_live.py -m 'core_model and cuda'"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-07"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 11
+    id: "omni-function"
+    title: "Qwen3-Omni nightly function tests"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -sv tests/e2e --run-level full_model -m 'full_model and H100 and B200 and omni and cards_1/cards_2'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "partial"
+    owner: "andyluo7"
+    planned_pr: "#7604"
+    pr: 7604
+    head_sha: "e09f54dea04785464961fa4dc0b67c5c235dc9f2"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 12
+    id: "omni-accuracy"
+    title: "Qwen3-Omni accuracy test"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -s -v tests/e2e/accuracy/qwen3_omni/test_qwen3_omni.py -m 'full_model and H100 and B200 and cards_2'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "partial"
+    owner: "andyluo7"
+    planned_pr: "#7604"
+    pr: 7604
+    head_sha: "e09f54dea04785464961fa4dc0b67c5c235dc9f2"
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 13
+    id: "omni-perf-sync"
+    title: "Omni performance without async chunk"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/dfx/perf/scripts/run_benchmark.py --test-config-file tests/dfx/perf/tests/test_qwen3_omni_no_async_chunk.json"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-06"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 14
+    id: "omni-perf-async"
+    title: "Omni performance with async chunk"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/dfx/perf/scripts/run_benchmark.py --test-config-file tests/dfx/perf/tests/test_qwen3_omni_async_chunk.json"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-06"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 15
+    id: "omni-perf-vllm-text"
+    title: "Omni vLLM text performance"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "Current CUDA weekly vLLM-text performance command"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 16
+    id: "omni-perf-multireplica"
+    title: "Omni multi-replica performance"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "Current CUDA weekly multi-replica performance command"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 17
+    id: "omni-multireplica-startup"
+    title: "Omni multi-replica startup test"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -s -v tests/e2e/online_serving/test_qwen3_omni_multi_replicas.py -m 'full_model and H100 and B200 and cards_4'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-06"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 18
+    id: "omni-doc"
+    title: "Omni documentation examples"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -s -v tests/examples/ -m 'full_model and omni and H100 and B200 and cards_2'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-06"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 19
+    id: "tts-voxcpm2-ready"
+    title: "Legacy VoxCPM2 ready job"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "Classify current TTS replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 20
+    id: "tts-higgs-ready"
+    title: "Legacy Higgs-Audio-V3 ready job"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "Classify current TTS replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 21
+    id: "tts-function"
+    title: "Current TTS nightly function coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest -s -v tests/e2e/ -m 'full_model and L4 and B200 and tts and cards_1'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-08"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 22
+    id: "tts-voxcpm2-accuracy"
+    title: "Legacy VoxCPM2 accuracy job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current TTS accuracy replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 23
+    id: "tts-performance"
+    title: "Current TTS performance coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/dfx/perf/scripts/run_benchmark.py --test-config-file tests/dfx/perf/tests/test_tts.json"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-08"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 24
+    id: "tts-voxcpm2-performance"
+    title: "Legacy VoxCPM2 performance job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current TTS performance replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 25
+    id: "tts-higgs-performance"
+    title: "Legacy Higgs-Audio-V3 performance job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current TTS performance replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 26
+    id: "z-image-online"
+    title: "Z-Image online-serving coverage"
+    cuda_source: ".buildkite/cuda/test-merge.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_z_image.py"
+    rocm_suite: ".buildkite/amd/test-amd-merge.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-09"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 27
+    id: "bagel-ready"
+    title: "Bagel ready coverage"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "Current Bagel ready command"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 28
+    id: "qwen-image-online"
+    title: "Qwen Image online-serving coverage"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_qwen_image.py -m core_model"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-09"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 29
+    id: "qwen-image-edit-ready"
+    title: "Legacy Qwen Image Edit ready job"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "Classify current Qwen Image replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 30
+    id: "qwen-image-layered-ready"
+    title: "Legacy Qwen Image Layered ready job"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "Classify current Qwen Image replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 31
+    id: "cosmos3-online"
+    title: "Cosmos3 online-serving coverage"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_cosmos3.py -m core_model"
+    rocm_suite: ".buildkite/amd/test-amd-ready.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-09"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 32
+    id: "flux2-klein-ready"
+    title: "Legacy FLUX.2 Klein ready job"
+    cuda_source: ".buildkite/cuda/test-merge.yml"
+    cuda_command: "Classify current FLUX.2 coverage in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 33
+    id: "stable-audio-generation"
+    title: "Stable Audio generation coverage"
+    cuda_source: ".buildkite/cuda/test-ready.yml"
+    cuda_command: "pytest tests/e2e/offline_inference/test_stable_audio_expansion.py"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 34
+    id: "x2i-function-single"
+    title: "X2I function single-GPU coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_qwen_image_expansion.py -m 'full_model and diffusion and H100 and B200 and cards_1'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 35
+    id: "x2i-function-qwen-multigpu"
+    title: "X2I Qwen Image multi-GPU coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_qwen_image_expansion.py -m 'full_model and diffusion and H100 and B200 and cards_2'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 36
+    id: "x2i-function-legacy-group"
+    title: "Legacy X2I Layered LongCat FLUX grouping"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2I function grouping in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 37
+    id: "x2i-function-bagel"
+    title: "Bagel multi-GPU function coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Current Bagel multi-GPU command"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 38
+    id: "x2i-glm-image"
+    title: "Legacy GLM-Image function job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current GLM-Image job in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 39
+    id: "x2i-doc"
+    title: "X2I documentation examples"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/examples/*/test_text_to_image.py -m 'full_model and example and H100 and B200 and (cards_1 or cards_2)'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 40
+    id: "x2i-accuracy"
+    title: "Qwen Image and diffusers-backend accuracy"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/accuracy/test_qwen_image.py and test_diffusers_backend_similarity.py"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 41
+    id: "hunyuan-image3-accuracy"
+    title: "HunyuanImage3-DIT accuracy"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/accuracy/test_hunyuan_image3_pixel_accuracy.py -m 'full_model and H100 and B200 and cards_4'"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 42
+    id: "x2i-qwen-image-performance"
+    title: "Qwen Image performance"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/dfx/perf/scripts/run_diffusion_benchmark.py --test-config-file tests/dfx/perf/tests/test_qwen_image_vllm_omni.json"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-10"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 43
+    id: "x2i-qwen-image-edit-performance"
+    title: "Legacy Qwen Image Edit performance job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2I performance replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 44
+    id: "x2i-qwen-image-edit-2511-performance"
+    title: "Legacy Qwen Image Edit 2511 performance job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2I performance replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 45
+    id: "x2i-qwen-image-layered-performance"
+    title: "Legacy Qwen Image Layered performance job"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2I performance replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 46
+    id: "x2i-bagel-performance"
+    title: "Bagel performance coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Current Bagel performance command"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 47
+    id: "x2v-wan22-t2v-function"
+    title: "Wan2.2 T2V function coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_wan22_expansion.py -k t2v"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 48
+    id: "x2v-wan22-i2v-function"
+    title: "Wan2.2 I2V and TI2V function coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_wan22_expansion.py -k i2v"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 49
+    id: "x2v-lingbot-function"
+    title: "LingBot video function coverage"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/online_serving/test_lingbot_video*.py tests/e2e/offline_inference/test_lingbot_world_v2.py"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 50
+    id: "x2v-other-function"
+    title: "Legacy X2V Other function grouping"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2V function grouping in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 51
+    id: "x2v-doc"
+    title: "X2V documentation examples"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/examples/offline_inference/test_image_to_video.py"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_1"
+    gpu_count: 1
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 52
+    id: "x2v-wan22-accuracy"
+    title: "Wan2.2 video accuracy"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/e2e/accuracy/wan22_i2v/test_wan22_i2v_video_similarity.py and diffusers backend similarity"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 53
+    id: "x2v-other-accuracy"
+    title: "Legacy X2V Other accuracy grouping"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current X2V accuracy grouping in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 54
+    id: "x2v-performance"
+    title: "Wan2.2 and Cosmos3 performance"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "pytest tests/dfx/perf/scripts/run_diffusion_benchmark.py with current X2V configs"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 55
+    id: "x2v-minimax-t2va-accuracy"
+    title: "Legacy MiniMax H3 T2VA accuracy name"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Classify current MiniMax H3 accuracy replacement in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 56
+    id: "x2v-minimax-performance"
+    title: "MiniMax-H3 four-GPU performance"
+    cuda_source: ".buildkite/cuda/test-nightly.yml"
+    cuda_command: "Current MiniMax-H3 four-GPU performance command"
+    rocm_suite: ".buildkite/amd/test-amd-nightly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-11"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 57
+    id: "reliability-qwen3-omni"
+    title: "Qwen3-Omni reliability"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "pytest tests/dfx/reliability/test_reliability_qwen3_omni.py"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 58
+    id: "reliability-wan22"
+    title: "Wan2.2 reliability"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "Current Wan2.2 reliability command"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 59
+    id: "reliability-hunyuan-image"
+    title: "Hunyuan Image reliability"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "Current Hunyuan Image reliability command"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_4"
+    gpu_count: 4
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 60
+    id: "reliability-voxcpm2"
+    title: "Legacy VoxCPM2 reliability job"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "Classify absence from current CUDA weekly suite in PR-13"
+    rocm_suite: null
+    rocm_queue: null
+    gpu_count: null
+    status: "unknown"
+    owner: "andyluo7"
+    planned_pr: "PR-13"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null
+  - issue_item: 61
+    id: "invalid-parameters"
+    title: "Invalid parameter reliability tests"
+    cuda_source: ".buildkite/cuda/test-weekly.yml"
+    cuda_command: "pytest tests/dfx/reliability/invalid_param_test/"
+    rocm_suite: ".buildkite/amd/test-amd-weekly.yml"
+    rocm_queue: "mi300_2"
+    gpu_count: 2
+    status: "missing"
+    owner: "andyluo7"
+    planned_pr: "PR-12"
+    pr: null
+    head_sha: null
+    builds: []
+    artifacts: []
+    resolution: null

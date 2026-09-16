@@ -375,6 +375,15 @@ steps:
     # flag alone does not override vLLM-Omni's diffusion backend selection.
     - export VLLM_ROCM_USE_AITER=0
     - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
+    # Each xdist/engine process needs its own MIOpen databases: sharing the
+    # default user DB corrupts concurrent writes. The sitecustomize hook also
+    # enables PyTorch's deterministic ROCm algorithms so the suite's exact
+    # same-seed output assertions exercise a deterministic backend contract.
+    - export VLLM_OMNI_ROCM_CI_DETERMINISTIC=1
+    - export VLLM_OMNI_ROCM_CI_MIOPEN_ROOT="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID"
+    - export CUBLAS_WORKSPACE_CONFIG=":4096:8"
+    - >-
+      export PYTHONPATH="$$BUILDKITE_BUILD_CHECKOUT_PATH/.buildkite/amd/rocm-ci-sitecustomize:$${PYTHONPATH:-}"
     - mkdir -p "$$ROCM_TINY_BASE_ARTIFACT_DIR"
     - >-
       ps -eo pid=,ppid=,lstart=,stat=,comm= >
@@ -399,6 +408,10 @@ steps:
       print(f"expected_gpus={expected_gpus}")
       print(f"vllm_rocm_use_aiter={os.environ.get('VLLM_ROCM_USE_AITER', 'unset')}")
       print(f"diffusion_attention_backend={os.environ.get('DIFFUSION_ATTENTION_BACKEND', 'unset')}")
+      print(f"cudnn_deterministic={torch.backends.cudnn.deterministic}")
+      print(f"deterministic_algorithms={torch.are_deterministic_algorithms_enabled()}")
+      print(f"miopen_user_db_path={os.environ.get('MIOPEN_USER_DB_PATH', 'unset')}")
+      print(f"miopen_custom_cache_dir={os.environ.get('MIOPEN_CUSTOM_CACHE_DIR', 'unset')}")
       print(f"image=rocm/vllm-omni:{os.environ.get('BUILDKITE_COMMIT', 'unknown')}")
       print(f"build_created_at={os.environ.get('BUILDKITE_BUILD_CREATED_AT', 'unknown')}")
       print(f"job_started_at={os.environ.get('BUILDKITE_JOB_STARTED_AT', 'unknown')}")

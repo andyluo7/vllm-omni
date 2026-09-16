@@ -79,10 +79,26 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     step = _find_step(TINY_BASE_LABEL)
     command = next(command for command in step["commands"] if "--junitxml=" in command)
     argv = split(command)
+    commands = "\n".join(step["commands"])
     assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
     assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in step["commands"]
-    assert "diffusion_attention_backend=" in "\n".join(step["commands"])
+    assert "export VLLM_OMNI_ROCM_CI_DETERMINISTIC=1" in step["commands"]
+    assert "VLLM_OMNI_ROCM_CI_MIOPEN_ROOT=" in commands
+    assert "rocm-ci-sitecustomize" in commands
+    assert "diffusion_attention_backend=" in commands
+    assert "cudnn_deterministic=" in commands
+    assert "deterministic_algorithms=" in commands
+    assert "miopen_user_db_path=" in commands
+    assert "miopen_custom_cache_dir=" in commands
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"
     assert argv[argv.index("--run-level") + 1] == "core_model"
     assert argv[argv.index("-n") + 1] == "4"
+
+
+def test_rocm_sitecustomize_is_present() -> None:
+    source = Path(".buildkite/amd/rocm-ci-sitecustomize/sitecustomize.py").read_text(encoding="utf-8")
+    assert 'os.environ["MIOPEN_USER_DB_PATH"]' in source
+    assert 'os.environ["MIOPEN_CUSTOM_CACHE_DIR"]' in source
+    assert "torch.backends.cudnn.deterministic = True" in source
+    assert "torch.use_deterministic_algorithms(True)" in source

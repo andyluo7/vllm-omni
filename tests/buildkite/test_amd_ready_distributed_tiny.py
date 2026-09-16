@@ -79,9 +79,9 @@ def test_distributed_cuda_scope_contains_rocm_runnable_gpu_smokes() -> None:
 def test_tiny_base_job_matches_current_cuda_scope() -> None:
     step = _find_step(TINY_BASE_LABEL)
     pytest_commands = [command for command in step["commands"] if "--junitxml=" in command]
-    default_command, deterministic_conv_command, ltx2_command, qwen_command = pytest_commands
+    default_command, native_conv_command, ltx2_command, qwen_command = pytest_commands
     default_argv = split(default_command)
-    deterministic_conv_argv = split(deterministic_conv_command)
+    native_conv_argv = split(native_conv_command)
     ltx2_argv = split(ltx2_command)
     qwen_argv = split(qwen_command)
     commands = "\n".join(step["commands"])
@@ -92,8 +92,8 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     assert "MIOPEN_DEBUG_DISABLE_FIND_DB" not in commands
     assert "MIOPEN_USER_DB_PATH=" in commands
     assert "MIOPEN_CUSTOM_CACHE_DIR=" in commands
-    assert "export VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS=0" in step["commands"]
-    assert "export VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS=1" in step["commands"]
+    assert "export VLLM_OMNI_ROCM_CI_DISABLE_MIOPEN=0" in step["commands"]
+    assert "export VLLM_OMNI_ROCM_CI_DISABLE_MIOPEN=1" in step["commands"]
     assert "export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=0" in step["commands"]
     assert "export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1" in step["commands"]
     assert "rocm-ci-sitecustomize" in commands
@@ -102,34 +102,32 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     assert "miopen_find_enforce=" in commands
     assert "miopen_user_db_path=" in commands
     assert "miopen_custom_cache_dir=" in commands
-    assert "default_cudnn_benchmark=" in commands
-    assert "default_cudnn_deterministic=" in commands
-    assert "deterministic_conv_cudnn_benchmark=" in commands
-    assert "deterministic_conv_cudnn_deterministic=" in commands
+    assert "default_cudnn_enabled=" in commands
+    assert "native_conv_cudnn_enabled=" in commands
     assert "default_flash_sdp_enabled=" in commands
     assert "default_mem_efficient_sdp_enabled=" in commands
     assert "default_math_sdp_enabled=" in commands
     assert "qwen_flash_sdp_enabled=" in commands
     assert "qwen_mem_efficient_sdp_enabled=" in commands
     assert "qwen_math_sdp_enabled=" in commands
-    for argv in (default_argv, deterministic_conv_argv, ltx2_argv, qwen_argv):
+    for argv in (default_argv, native_conv_argv, ltx2_argv, qwen_argv):
         assert "tests/model_tests/diffusion/" in argv
         assert argv[argv.index("-m") + 1] == "core_model and cuda"
         assert argv[argv.index("--run-level") + 1] == "core_model"
         assert argv[argv.index("-n") + 1] == "1"
     qwen_models = "QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline"
-    deterministic_conv_models = "LongCatImageEditPipeline or FluxKontextPipeline"
-    special_models = f"LTX2Pipeline or {deterministic_conv_models} or {qwen_models}"
+    native_conv_models = "LongCatImageEditPipeline or FluxKontextPipeline"
+    special_models = f"LTX2Pipeline or {native_conv_models} or {qwen_models}"
     assert default_argv[default_argv.index("-k") + 1] == f"not ({special_models})"
-    assert deterministic_conv_argv[deterministic_conv_argv.index("-k") + 1] == deterministic_conv_models
+    assert native_conv_argv[native_conv_argv.index("-k") + 1] == native_conv_models
     assert ltx2_argv[ltx2_argv.index("-k") + 1] == "LTX2Pipeline"
     assert qwen_argv[qwen_argv.index("-k") + 1] == qwen_models
     assert "timeout --signal=TERM --kill-after=1m 30m" in default_command
-    assert "timeout --signal=TERM --kill-after=1m 15m" in deterministic_conv_command
+    assert "timeout --signal=TERM --kill-after=1m 15m" in native_conv_command
     assert "timeout --signal=TERM --kill-after=1m 10m" in ltx2_command
     assert "timeout --signal=TERM --kill-after=1m 10m" in qwen_command
     assert "pytest-default.xml" in commands
-    assert "pytest-deterministic-conv.xml" in commands
+    assert "pytest-native-conv.xml" in commands
     assert "pytest-ltx2.xml" in commands
     assert "pytest-qwen-math.xml" in commands
 
@@ -137,9 +135,9 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
 def test_rocm_sitecustomize_applies_only_requested_kernel_controls() -> None:
     source = Path(".buildkite/amd/rocm-ci-sitecustomize/sitecustomize.py").read_text(encoding="utf-8")
     assert 'os.environ.get("VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA")' in source
-    assert 'os.environ.get("VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS")' in source
-    assert "torch.backends.cudnn.benchmark = False" in source
-    assert "torch.backends.cudnn.deterministic = True" in source
+    assert 'os.environ.get("VLLM_OMNI_ROCM_CI_DISABLE_MIOPEN")' in source
+    assert "torch.backends.cudnn.enabled = False" in source
+    assert "torch.backends.cudnn.deterministic" not in source
     assert "torch.backends.cuda.enable_flash_sdp(False)" in source
     assert "torch.backends.cuda.enable_mem_efficient_sdp(False)" in source
     assert "torch.backends.cuda.enable_math_sdp(True)" in source

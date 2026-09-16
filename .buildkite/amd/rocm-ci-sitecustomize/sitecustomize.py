@@ -10,8 +10,8 @@ import os
 
 def _configure_rocm_ci() -> None:
     force_math_sdpa = os.environ.get("VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA") == "1"
-    deterministic_convolutions = os.environ.get("VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS") == "1"
-    if not (force_math_sdpa or deterministic_convolutions):
+    disable_miopen = os.environ.get("VLLM_OMNI_ROCM_CI_DISABLE_MIOPEN") == "1"
+    if not (force_math_sdpa or disable_miopen):
         return
 
     try:
@@ -22,9 +22,8 @@ def _configure_rocm_ci() -> None:
     if not torch.version.hip:
         return
 
-    if deterministic_convolutions:
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.deterministic = True
+    if disable_miopen:
+        torch.backends.cudnn.enabled = False
 
     if force_math_sdpa:
         torch.backends.cuda.enable_flash_sdp(False)

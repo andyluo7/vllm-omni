@@ -140,17 +140,22 @@ steps:
         depends_on: amd-build
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
-        timeout_in_minutes: 70
+        timeout_in_minutes: 100
         artifact_paths:
           - "artifacts/rocm-diffusion-quant-h100/**/*"
         commands:
           - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-diffusion-quant-h100"
           - mkdir -p "$$ROCM_CI_ARTIFACT_DIR"
+          # The quality gate compares BF16 and FP8 under the same attention
+          # backend. Avoid first-use AITER JIT consuming Omni's 600-second
+          # startup budget on ROCm and poisoning later cases in this shard.
+          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$ROCM_CI_ARTIFACT_DIR/environment.txt"
+          - echo "diffusion_attention_backend=$$DIFFUSION_ATTENTION_BACKEND" >> "$$ROCM_CI_ARTIFACT_DIR/environment.txt"
           - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
           - export ROCM_TEST_STARTED_EPOCH=$$(date +%s)
           - >-
-            timeout --signal=TERM --kill-after=1m 60m
+            timeout --signal=TERM --kill-after=1m 90m
             pytest -s -v -ra
             tests/diffusion/quantization/
             -m 'full_model and cuda and H100 and B200 and cards_1'

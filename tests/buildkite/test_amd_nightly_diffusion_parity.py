@@ -17,7 +17,7 @@ EVIDENCE_SCRIPT = Path(".buildkite/amd/scripts/rocm_ci_evidence.py")
 JOBS = {
     "ROCm · Tiny Diffusion Multi-GPU · 2-GPU": ("mi300_2", 40, "artifacts/rocm-tiny-diffusion-2gpu"),
     "ROCm · Tiny Diffusion Multi-GPU · 4-GPU": ("mi300_4", 40, "artifacts/rocm-tiny-diffusion-4gpu"),
-    "ROCm · Diffusion Quantization · H100-class Scope": ("mi300_1", 70, "artifacts/rocm-diffusion-quant-h100"),
+    "ROCm · Diffusion Quantization · H100-class Scope": ("mi300_1", 100, "artifacts/rocm-diffusion-quant-h100"),
     "ROCm · Diffusion Quantization · Legacy L4 Scope": ("mi300_1", 70, "artifacts/rocm-diffusion-quant-l4"),
 }
 
@@ -82,6 +82,15 @@ def test_jobs_match_current_cuda_marker_scopes(label: str, markers: str, run_lev
     if "Multi-GPU" in label:
         assert "export VLLM_OMNI_TEST_INIT_TIMEOUT=900" in step["commands"]
         assert "export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=600" in step["commands"]
+
+
+def test_h100_quantization_uses_rocm_stable_attention_backend_and_budget() -> None:
+    commands = _find_step("ROCm · Diffusion Quantization · H100-class Scope")["commands"]
+    command_text = "\n".join(commands)
+
+    assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in commands
+    assert "diffusion_attention_backend=$$DIFFUSION_ATTENTION_BACKEND" in command_text
+    assert "timeout --signal=TERM --kill-after=1m 90m" in command_text
 
 
 def test_legacy_l4_scope_installs_pinned_gguf_plugin() -> None:

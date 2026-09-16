@@ -370,9 +370,11 @@ steps:
     - export ROCM_TINY_BASE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-tiny-diffusion-base"
     # AITER's process-shared JIT baton can strand sibling pytest-xdist workers
     # while one worker compiles the first attention kernel. This parity job is
-    # backend-agnostic, so use ROCm fallback kernels while retaining the full
-    # CUDA-equivalent selection and four-way test parallelism.
+    # backend-agnostic, so select Torch SDPA explicitly while retaining the
+    # full CUDA-equivalent selection and four-way test parallelism. The vLLM
+    # flag alone does not override vLLM-Omni's diffusion backend selection.
     - export VLLM_ROCM_USE_AITER=0
+    - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
     - mkdir -p "$$ROCM_TINY_BASE_ARTIFACT_DIR"
     - >-
       ps -eo pid=,ppid=,lstart=,stat=,comm= >
@@ -396,6 +398,7 @@ steps:
       print(f"visible_gpus={visible_gpus}")
       print(f"expected_gpus={expected_gpus}")
       print(f"vllm_rocm_use_aiter={os.environ.get('VLLM_ROCM_USE_AITER', 'unset')}")
+      print(f"diffusion_attention_backend={os.environ.get('DIFFUSION_ATTENTION_BACKEND', 'unset')}")
       print(f"image=rocm/vllm-omni:{os.environ.get('BUILDKITE_COMMIT', 'unknown')}")
       print(f"build_created_at={os.environ.get('BUILDKITE_BUILD_CREATED_AT', 'unknown')}")
       print(f"job_started_at={os.environ.get('BUILDKITE_JOB_STARTED_AT', 'unknown')}")

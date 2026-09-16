@@ -40,7 +40,7 @@ def _find_step(label: str) -> dict:
 def test_new_ready_jobs_follow_rocm_evidence_contract(label: str, artifact_dir: str) -> None:
     step = _find_step(label)
     commands = step["commands"]
-    pytest_commands = [command for command in commands if "pytest " in command]
+    pytest_commands = [command for command in commands if "--junitxml=" in command]
 
     assert step["agent_pool"] == "mi300_1"
     assert step["grade"] == "NonBlocking"
@@ -54,19 +54,29 @@ def test_new_ready_jobs_follow_rocm_evidence_contract(label: str, artifact_dir: 
     assert "expected {expected_gpus} ROCm GPU(s)" in "\n".join(commands)
     assert "process-cleanup.txt" in "\n".join(commands)
     assert "pytest-summary.txt" in "\n".join(commands)
+    assert "pytest-result.txt" in "\n".join(commands)
+    assert "executed = tests - skipped" in "\n".join(commands)
+    assert "tests == 0 or executed == 0 or failures or errors" in "\n".join(commands)
     assert "--junitxml=" in pytest_commands[0]
 
 
 def test_distributed_job_matches_current_cuda_scope() -> None:
-    command = next(command for command in _find_step(DISTRIBUTED_LABEL)["commands"] if "pytest " in command)
+    command = next(command for command in _find_step(DISTRIBUTED_LABEL)["commands"] if "--junitxml=" in command)
     argv = split(command)
     assert "tests/distributed/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda and L4"
     assert argv[argv.index("--run-level") + 1] == "core_model"
 
 
+def test_distributed_cuda_scope_contains_rocm_runnable_gpu_smokes() -> None:
+    source = Path("tests/distributed/omni_connectors/test_mooncake_transfer_engine_buffer.py").read_text(
+        encoding="utf-8"
+    )
+    assert source.count('@hardware_test(res={"cuda": "L4"}, num_cards=1)') == 2
+
+
 def test_tiny_base_job_matches_current_cuda_scope() -> None:
-    command = next(command for command in _find_step(TINY_BASE_LABEL)["commands"] if "pytest " in command)
+    command = next(command for command in _find_step(TINY_BASE_LABEL)["commands"] if "--junitxml=" in command)
     argv = split(command)
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"

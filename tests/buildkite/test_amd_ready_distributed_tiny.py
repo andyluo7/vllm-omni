@@ -44,7 +44,8 @@ def test_new_ready_jobs_follow_rocm_evidence_contract(label: str, artifact_dir: 
 
     assert step["agent_pool"] == "mi300_1"
     assert step["grade"] == "NonBlocking"
-    assert step["timeout_in_minutes"] == 30
+    expected_timeout = 60 if label == TINY_BASE_LABEL else 30
+    assert step["timeout_in_minutes"] == expected_timeout
     assert step["artifact_paths"] == [f"{artifact_dir}/**/*"]
     assert len(pytest_commands) == 1
     assert "--collect-only" not in "\n".join(commands)
@@ -82,23 +83,15 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     commands = "\n".join(step["commands"])
     assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
     assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in step["commands"]
-    assert "export VLLM_OMNI_ROCM_CI_DETERMINISTIC=1" in step["commands"]
-    assert "VLLM_OMNI_ROCM_CI_MIOPEN_ROOT=" in commands
-    assert "rocm-ci-sitecustomize" in commands
+    assert "export MIOPEN_FIND_MODE=FAST" in step["commands"]
+    assert "export MIOPEN_DEBUG_DISABLE_FIND_DB=1" in step["commands"]
+    assert "MIOPEN_CUSTOM_CACHE_DIR=" in commands
     assert "diffusion_attention_backend=" in commands
-    assert "cudnn_deterministic=" in commands
-    assert "deterministic_algorithms=" in commands
-    assert "miopen_user_db_path=" in commands
+    assert "miopen_find_mode=" in commands
+    assert "miopen_find_db_disabled=" in commands
     assert "miopen_custom_cache_dir=" in commands
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"
     assert argv[argv.index("--run-level") + 1] == "core_model"
-    assert argv[argv.index("-n") + 1] == "4"
-
-
-def test_rocm_sitecustomize_is_present() -> None:
-    source = Path(".buildkite/amd/rocm-ci-sitecustomize/sitecustomize.py").read_text(encoding="utf-8")
-    assert 'os.environ["MIOPEN_USER_DB_PATH"]' in source
-    assert 'os.environ["MIOPEN_CUSTOM_CACHE_DIR"]' in source
-    assert "torch.backends.cudnn.deterministic = True" in source
-    assert "torch.use_deterministic_algorithms(True)" in source
+    assert argv[argv.index("-n") + 1] == "1"
+    assert "timeout --signal=TERM --kill-after=1m 50m" in command

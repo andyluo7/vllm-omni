@@ -83,7 +83,7 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     commands = "\n".join(step["commands"])
     assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
     assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in step["commands"]
-    assert "export MIOPEN_FIND_MODE=FAST" in step["commands"]
+    assert "export MIOPEN_FIND_MODE=NORMAL" in step["commands"]
     assert "export MIOPEN_DEBUG_DISABLE_FIND_DB=1" in step["commands"]
     assert "MIOPEN_CUSTOM_CACHE_DIR=" in commands
     assert "diffusion_attention_backend=" in commands

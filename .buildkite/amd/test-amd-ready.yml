@@ -373,12 +373,12 @@ steps:
     # backend-agnostic, so select Torch SDPA explicitly. Run one xdist worker:
     # concurrent tiny pipelines on the same GPU made otherwise same-seed runs
     # non-deterministic and concurrently corrupted MIOpen's writable FindDb.
-    # FAST mode uses MIOpen's immediate fallback on a FindDb miss, while the
+    # NORMAL mode searches for a supported solver (required by LTX2), while the
     # disabled user FindDb prevents this smoke lane from reading or writing a
     # shared per-user database. The selected CUDA-equivalent cases are unchanged.
     - export VLLM_ROCM_USE_AITER=0
     - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
-    - export MIOPEN_FIND_MODE=FAST
+    - export MIOPEN_FIND_MODE=NORMAL
     - export MIOPEN_DEBUG_DISABLE_FIND_DB=1
     - export MIOPEN_CUSTOM_CACHE_DIR="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID/cache"
     - mkdir -p "$$ROCM_TINY_BASE_ARTIFACT_DIR"

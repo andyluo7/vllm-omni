@@ -370,23 +370,27 @@ steps:
     - export ROCM_TINY_BASE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-tiny-diffusion-base"
     # AITER's process-shared JIT baton can strand sibling pytest-xdist workers
     # while one worker compiles the first attention kernel. This parity job is
-    # backend-agnostic, so select Torch SDPA explicitly. Run one xdist worker:
-    # concurrent tiny pipelines on the same GPU made otherwise same-seed runs
-    # non-deterministic and concurrently corrupted MIOpen's writable FindDb.
-    # NORMAL mode searches for a supported solver (required by LTX2), while the
-    # disabled user FindDb prevents this smoke lane from reading or writing a
-    # shared per-user database. Force PyTorch's math SDPA backend in each Python
-    # process so the same-seed checks do not use nondeterministic fused ROCm SDPA.
-    # The selected CUDA-equivalent cases are unchanged.
+    # backend-agnostic, so select Torch SDPA explicitly and run one xdist worker.
+    # Give MIOpen a per-job writable FindDb/cache and enable incremental tuning:
+    # LTX2 needs a real solver search, while sharing the database made concurrent
+    # jobs corrupt it. Most pipelines
+    # need fused SDPA to avoid excessive memory use and retain determinism; the
+    # three Qwen pipelines need math SDPA for their same-seed checks. Partitioning
+    # by model keeps every CUDA-equivalent case while applying math SDPA narrowly.
     - export VLLM_ROCM_USE_AITER=0
     - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
-    - export MIOPEN_FIND_MODE=NORMAL
-    - export MIOPEN_DEBUG_DISABLE_FIND_DB=1
+    - export MIOPEN_FIND_MODE=3
+    - export MIOPEN_FIND_ENFORCE=3
+    - export MIOPEN_USER_DB_PATH="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID/db"
     - export MIOPEN_CUSTOM_CACHE_DIR="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID/cache"
-    - export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1
+    - export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=0
     - >-
       export PYTHONPATH="$$BUILDKITE_BUILD_CHECKOUT_PATH/.buildkite/amd/rocm-ci-sitecustomize:$${PYTHONPATH:-}"
-    - mkdir -p "$$ROCM_TINY_BASE_ARTIFACT_DIR"
+    - >-
+      mkdir -p
+      "$$ROCM_TINY_BASE_ARTIFACT_DIR"
+      "$$MIOPEN_USER_DB_PATH"
+      "$$MIOPEN_CUSTOM_CACHE_DIR"
     - >-
       ps -eo pid=,ppid=,lstart=,stat=,comm= >
       "$$ROCM_TINY_BASE_ARTIFACT_DIR/processes-before.txt"
@@ -411,44 +415,86 @@ steps:
       print(f"vllm_rocm_use_aiter={os.environ.get('VLLM_ROCM_USE_AITER', 'unset')}")
       print(f"diffusion_attention_backend={os.environ.get('DIFFUSION_ATTENTION_BACKEND', 'unset')}")
       print(f"miopen_find_mode={os.environ.get('MIOPEN_FIND_MODE', 'unset')}")
-      print(f"miopen_find_db_disabled={os.environ.get('MIOPEN_DEBUG_DISABLE_FIND_DB', 'unset')}")
+      print(f"miopen_find_enforce={os.environ.get('MIOPEN_FIND_ENFORCE', 'unset')}")
+      print(f"miopen_user_db_path={os.environ.get('MIOPEN_USER_DB_PATH', 'unset')}")
       print(f"miopen_custom_cache_dir={os.environ.get('MIOPEN_CUSTOM_CACHE_DIR', 'unset')}")
-      print(f"flash_sdp_enabled={torch.backends.cuda.flash_sdp_enabled()}")
-      print(f"mem_efficient_sdp_enabled={torch.backends.cuda.mem_efficient_sdp_enabled()}")
-      print(f"math_sdp_enabled={torch.backends.cuda.math_sdp_enabled()}")
+      print(f"default_flash_sdp_enabled={torch.backends.cuda.flash_sdp_enabled()}")
+      print(f"default_mem_efficient_sdp_enabled={torch.backends.cuda.mem_efficient_sdp_enabled()}")
+      print(f"default_math_sdp_enabled={torch.backends.cuda.math_sdp_enabled()}")
       print(f"image=rocm/vllm-omni:{os.environ.get('BUILDKITE_COMMIT', 'unknown')}")
       print(f"build_created_at={os.environ.get('BUILDKITE_BUILD_CREATED_AT', 'unknown')}")
       print(f"job_started_at={os.environ.get('BUILDKITE_JOB_STARTED_AT', 'unknown')}")
       PY
     - >-
-      timeout --signal=TERM --kill-after=1m 50m
+      timeout --signal=TERM --kill-after=1m 40m
       pytest -s -v -ra -n 1
       tests/model_tests/diffusion/
       -m 'core_model and cuda'
+      -k 'not (QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline)'
       --run-level "core_model"
       --durations=0
-      --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest.xml"
-      2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest.log"
+      --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.xml"
+      2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.log"
+    - export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1
+    - |
+      python3 - <<'PY' >> "$$ROCM_TINY_BASE_ARTIFACT_DIR/environment.txt"
+      import torch
+
+      print(f"qwen_flash_sdp_enabled={torch.backends.cuda.flash_sdp_enabled()}")
+      print(f"qwen_mem_efficient_sdp_enabled={torch.backends.cuda.mem_efficient_sdp_enabled()}")
+      print(f"qwen_math_sdp_enabled={torch.backends.cuda.math_sdp_enabled()}")
+      PY
     - >-
-      tail -n 100 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest.log" >
-      "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-summary.txt"
+      timeout --signal=TERM --kill-after=1m 10m
+      pytest -s -v -ra -n 1
+      tests/model_tests/diffusion/
+      -m 'core_model and cuda'
+      -k 'QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline'
+      --run-level "core_model"
+      --durations=0
+      --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-qwen-math.xml"
+      2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-qwen-math.log"
+    - >-
+      {
+      echo '=== default fused SDPA partition ===';
+      tail -n 75 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.log";
+      echo '=== Qwen math SDPA partition ===';
+      tail -n 75 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-qwen-math.log";
+      } > "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-summary.txt"
     - |
       python3 - <<'PY' | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-result.txt"
       import os
       from xml.etree import ElementTree
 
-      report = ElementTree.parse(
-          os.path.join(os.environ["ROCM_TINY_BASE_ARTIFACT_DIR"], "pytest.xml")
-      ).getroot()
-      suites = [report] if report.tag == "testsuite" else report.findall("./testsuite")
-      tests = sum(int(suite.attrib.get("tests", 0)) for suite in suites)
-      skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
-      failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
-      errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
-      executed = tests - skipped
-      print(f"tests={tests} skipped={skipped} executed={executed} failures={failures} errors={errors}")
-      if tests == 0 or executed == 0 or failures or errors:
-          raise SystemExit("pytest did not produce a clean, non-empty executed test set")
+      artifact_dir = os.environ["ROCM_TINY_BASE_ARTIFACT_DIR"]
+      report_paths = [
+          os.path.join(artifact_dir, "pytest-default.xml"),
+          os.path.join(artifact_dir, "pytest-qwen-math.xml"),
+      ]
+      totals = {"tests": 0, "skipped": 0, "executed": 0, "failures": 0, "errors": 0}
+      for path in report_paths:
+          report = ElementTree.parse(path).getroot()
+          suites = [report] if report.tag == "testsuite" else report.findall("./testsuite")
+          tests = sum(int(suite.attrib.get("tests", 0)) for suite in suites)
+          skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
+          failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
+          errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
+          executed = tests - skipped
+          print(
+              f"report={os.path.basename(path)} tests={tests} skipped={skipped} "
+              f"executed={executed} failures={failures} errors={errors}"
+          )
+          if tests == 0 or executed == 0 or failures or errors:
+              raise SystemExit(f"{path} did not contain a clean, non-empty executed test set")
+          for key, value in (
+              ("tests", tests),
+              ("skipped", skipped),
+              ("executed", executed),
+              ("failures", failures),
+              ("errors", errors),
+          ):
+              totals[key] += value
+      print(" ".join(f"total_{key}={value}" for key, value in totals.items()))
       PY
     - |
       sleep 5

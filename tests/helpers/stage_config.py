@@ -349,6 +349,22 @@ _CI_OVERLAYS: dict[str, dict[str, Any]] = {
             },
         ],
         "platforms": {
+            "rocm": {
+                "stages": [
+                    {
+                        "stage_id": 0,
+                        # MI300 function/accuracy runs exercise concurrent
+                        # multimodal encoder work. Percentage sizing left a
+                        # 103.74 GiB KV cache in Buildkite #11941 and only
+                        # 3.04 GiB free before a 4.12 GiB audio-encoder
+                        # allocation. Bound the CI-only cache explicitly so
+                        # those transient allocations retain headroom without
+                        # changing the production deploy configuration.
+                        "gpu_memory_utilization": None,
+                        "kv_cache_memory_bytes": 80 * 1024**3,
+                    },
+                ],
+            },
             "xpu": {
                 "stages": [
                     {

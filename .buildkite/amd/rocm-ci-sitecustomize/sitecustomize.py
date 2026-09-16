@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
 
-"""ROCm CI setup for deterministic tiny diffusion attention."""
+"""ROCm CI setup for deterministic tiny diffusion kernels."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ import os
 
 
 def _configure_rocm_ci() -> None:
-    if os.environ.get("VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA") != "1":
+    force_math_sdpa = os.environ.get("VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA") == "1"
+    deterministic_convolutions = os.environ.get("VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS") == "1"
+    if not (force_math_sdpa or deterministic_convolutions):
         return
 
     try:
@@ -17,7 +19,14 @@ def _configure_rocm_ci() -> None:
     except ModuleNotFoundError:
         return
 
-    if torch.version.hip:
+    if not torch.version.hip:
+        return
+
+    if deterministic_convolutions:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+
+    if force_math_sdpa:
         torch.backends.cuda.enable_flash_sdp(False)
         torch.backends.cuda.enable_mem_efficient_sdp(False)
         torch.backends.cuda.enable_math_sdp(True)

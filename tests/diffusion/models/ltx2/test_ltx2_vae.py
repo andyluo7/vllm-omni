@@ -78,6 +78,32 @@ def test_ltx_base_vocoder_keeps_native_dtype(monkeypatch):
     assert output.dtype == torch.bfloat16
 
 
+def test_ltx_base_vocoder_uses_fp32_on_rocm(monkeypatch):
+    import vllm_omni.diffusion.models.ltx2.ltx2_runtime as ltx_runtime
+
+    class FakeBaseVocoder(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.ones(1, dtype=torch.bfloat16))
+            self.input_dtype = None
+            self.weight_dtype = None
+
+        def forward(self, value):
+            self.input_dtype = value.dtype
+            self.weight_dtype = self.weight.dtype
+            return value
+
+    monkeypatch.setattr(ltx_runtime, "_is_rocm_device", lambda _device_type: True)
+    vocoder = FakeBaseVocoder()
+
+    output = ltx_runtime._run_ltx_vocoder(vocoder, torch.ones(1, dtype=torch.bfloat16))
+
+    assert vocoder.input_dtype == torch.float32
+    assert vocoder.weight_dtype == torch.float32
+    assert vocoder.weight.dtype == torch.bfloat16
+    assert output.dtype == torch.bfloat16
+
+
 class TestLTXDiffusionDecoder:
     def test_diffusion_decoder_reuses_diffusers_with_scoped_overrides(self, monkeypatch):
         from diffusers.models.autoencoders.ltx2_diffusion_decoder import (

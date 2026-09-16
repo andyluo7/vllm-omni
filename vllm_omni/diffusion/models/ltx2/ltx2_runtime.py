@@ -75,12 +75,26 @@ def _deterministic_ltx_vocoder():
         torch.backends.cudnn.deterministic = previous
 
 
+def _is_rocm_device(device_type: str) -> bool:
+    return device_type == "cuda" and torch.version.hip is not None
+
+
 def _run_ltx_vocoder(vocoder: nn.Module, generated_mel: torch.Tensor) -> torch.Tensor:
     """Run the BWE vocoder in FP32, matching the official LTX pipeline."""
     device_type = generated_mel.device.type
     cudnn_context = _deterministic_ltx_vocoder() if device_type == "cuda" else nullcontext()
     with cudnn_context:
         if not hasattr(vocoder, "bwe_generator"):
+            if _is_rocm_device(device_type):
+                input_dtype = generated_mel.dtype
+                module_dtype = next(vocoder.parameters()).dtype
+                if module_dtype != torch.float32:
+                    vocoder.float()
+                try:
+                    return vocoder(generated_mel.float()).to(input_dtype)
+                finally:
+                    if module_dtype != torch.float32:
+                        vocoder.to(module_dtype)
             return vocoder(generated_mel)
 
         input_dtype = generated_mel.dtype

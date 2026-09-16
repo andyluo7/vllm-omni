@@ -80,6 +80,8 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     command = next(command for command in step["commands"] if "--junitxml=" in command)
     argv = split(command)
     assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
+    assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in step["commands"]
+    assert "diffusion_attention_backend=" in "\n".join(step["commands"])
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"
     assert argv[argv.index("--run-level") + 1] == "core_model"

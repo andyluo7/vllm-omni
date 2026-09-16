@@ -76,8 +76,10 @@ def test_distributed_cuda_scope_contains_rocm_runnable_gpu_smokes() -> None:
 
 
 def test_tiny_base_job_matches_current_cuda_scope() -> None:
-    command = next(command for command in _find_step(TINY_BASE_LABEL)["commands"] if "--junitxml=" in command)
+    step = _find_step(TINY_BASE_LABEL)
+    command = next(command for command in step["commands"] if "--junitxml=" in command)
     argv = split(command)
+    assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"
     assert argv[argv.index("--run-level") + 1] == "core_model"

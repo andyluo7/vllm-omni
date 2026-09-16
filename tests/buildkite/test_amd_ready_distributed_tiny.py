@@ -47,7 +47,7 @@ def test_new_ready_jobs_follow_rocm_evidence_contract(label: str, artifact_dir: 
     expected_timeout = 60 if label == TINY_BASE_LABEL else 30
     assert step["timeout_in_minutes"] == expected_timeout
     assert step["artifact_paths"] == [f"{artifact_dir}/**/*"]
-    assert len(pytest_commands) == 1
+    assert len(pytest_commands) == (2 if label == TINY_BASE_LABEL else 1)
     assert "--collect-only" not in "\n".join(commands)
     assert "VLLM_CI_ALLOW_NO_TESTS" not in "\n".join(commands)
     assert "environment.txt" in "\n".join(commands)
@@ -78,28 +78,44 @@ def test_distributed_cuda_scope_contains_rocm_runnable_gpu_smokes() -> None:
 
 def test_tiny_base_job_matches_current_cuda_scope() -> None:
     step = _find_step(TINY_BASE_LABEL)
-    command = next(command for command in step["commands"] if "--junitxml=" in command)
-    argv = split(command)
+    pytest_commands = [command for command in step["commands"] if "--junitxml=" in command]
+    default_command, qwen_command = pytest_commands
+    default_argv = split(default_command)
+    qwen_argv = split(qwen_command)
     commands = "\n".join(step["commands"])
     assert "export VLLM_ROCM_USE_AITER=0" in step["commands"]
     assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in step["commands"]
-    assert "export MIOPEN_FIND_MODE=NORMAL" in step["commands"]
-    assert "export MIOPEN_DEBUG_DISABLE_FIND_DB=1" in step["commands"]
+    assert "export MIOPEN_FIND_MODE=3" in step["commands"]
+    assert "export MIOPEN_FIND_ENFORCE=3" in step["commands"]
+    assert "MIOPEN_DEBUG_DISABLE_FIND_DB" not in commands
+    assert "MIOPEN_USER_DB_PATH=" in commands
     assert "MIOPEN_CUSTOM_CACHE_DIR=" in commands
+    assert "export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=0" in step["commands"]
     assert "export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1" in step["commands"]
     assert "rocm-ci-sitecustomize" in commands
     assert "diffusion_attention_backend=" in commands
     assert "miopen_find_mode=" in commands
-    assert "miopen_find_db_disabled=" in commands
+    assert "miopen_find_enforce=" in commands
+    assert "miopen_user_db_path=" in commands
     assert "miopen_custom_cache_dir=" in commands
-    assert "flash_sdp_enabled=" in commands
-    assert "mem_efficient_sdp_enabled=" in commands
-    assert "math_sdp_enabled=" in commands
-    assert "tests/model_tests/diffusion/" in argv
-    assert argv[argv.index("-m") + 1] == "core_model and cuda"
-    assert argv[argv.index("--run-level") + 1] == "core_model"
-    assert argv[argv.index("-n") + 1] == "1"
-    assert "timeout --signal=TERM --kill-after=1m 50m" in command
+    assert "default_flash_sdp_enabled=" in commands
+    assert "default_mem_efficient_sdp_enabled=" in commands
+    assert "default_math_sdp_enabled=" in commands
+    assert "qwen_flash_sdp_enabled=" in commands
+    assert "qwen_mem_efficient_sdp_enabled=" in commands
+    assert "qwen_math_sdp_enabled=" in commands
+    for argv in (default_argv, qwen_argv):
+        assert "tests/model_tests/diffusion/" in argv
+        assert argv[argv.index("-m") + 1] == "core_model and cuda"
+        assert argv[argv.index("--run-level") + 1] == "core_model"
+        assert argv[argv.index("-n") + 1] == "1"
+    qwen_models = "QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline"
+    assert default_argv[default_argv.index("-k") + 1] == f"not ({qwen_models})"
+    assert qwen_argv[qwen_argv.index("-k") + 1] == qwen_models
+    assert "timeout --signal=TERM --kill-after=1m 40m" in default_command
+    assert "timeout --signal=TERM --kill-after=1m 10m" in qwen_command
+    assert "pytest-default.xml" in commands
+    assert "pytest-qwen-math.xml" in commands
 
 
 def test_rocm_sitecustomize_forces_math_sdpa_only() -> None:

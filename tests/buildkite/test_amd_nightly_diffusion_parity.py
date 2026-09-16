@@ -74,10 +74,14 @@ def test_jobs_are_nonblocking_and_retain_evidence(label: str, contract: tuple[st
     ],
 )
 def test_jobs_match_current_cuda_marker_scopes(label: str, markers: str, run_level: str) -> None:
-    command = next(command for command in _find_step(label)["commands"] if "pytest " in command)
+    step = _find_step(label)
+    command = next(command for command in step["commands"] if "pytest " in command)
     argv = split(command)
     assert argv[argv.index("-m") + 1] == markers
     assert argv[argv.index("--run-level") + 1] == run_level
+    if "Multi-GPU" in label:
+        assert "export VLLM_OMNI_TEST_INIT_TIMEOUT=900" in step["commands"]
+        assert "export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=600" in step["commands"]
 
 
 def test_legacy_l4_scope_installs_pinned_gguf_plugin() -> None:
@@ -91,5 +95,6 @@ def test_evidence_process_identity_includes_start_time() -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    rows = module._process_identities("12 1 Mon Sep 15 10:00:00 2026 S python3\n")
+    process_table = "12 1 Mon Sep 15 10:00:00 2026 S python3\n13 1 Mon Sep 15 10:00:01 2026 S python3\n"
+    rows = module._process_identities(process_table, ignored_pids={13})
     assert rows == {"12|Mon|Sep|15|10:00:00|2026": "12 1 Mon Sep 15 10:00:00 2026 S python3"}

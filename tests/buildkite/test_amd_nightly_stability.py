@@ -60,6 +60,23 @@ def test_qwen3_ci_overlay_pins_only_the_talker_sampling_seed(monkeypatch: pytest
     assert "seed" not in production_talker["default_sampling_params"]
 
 
+def test_qwen3_ci_overlay_reserves_rocm_thinker_encoder_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_stage_config_helper(monkeypatch)
+    generated = Path(module.get_deploy_config_path("ci/qwen3_omni_moe.yaml"))
+    overlay = yaml.safe_load(generated.read_text(encoding="utf-8"))
+    rocm_thinker = next(stage for stage in overlay["platforms"]["rocm"]["stages"] if stage["stage_id"] == 0)
+
+    assert rocm_thinker == {
+        "stage_id": 0,
+        "gpu_memory_utilization": None,
+        "kv_cache_memory_bytes": 80 * 1024**3,
+    }
+    production = yaml.safe_load(Path("vllm_omni/deploy/qwen3_omni_moe.yaml").read_text(encoding="utf-8"))
+    production_thinker = next(stage for stage in production["stages"] if stage["stage_id"] == 0)
+    assert production_thinker["gpu_memory_utilization"] == 0.9
+    assert "kv_cache_memory_bytes" not in production_thinker
+
+
 def test_function_expansion_uses_the_seeded_ci_overlay() -> None:
     source = FUNCTION_TEST.read_text(encoding="utf-8")
     assert 'get_deploy_config_path("ci/qwen3_omni_moe.yaml")' in source

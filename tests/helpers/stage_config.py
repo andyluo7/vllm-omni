@@ -327,7 +327,10 @@ _CI_OVERLAYS: dict[str, dict[str, Any]] = {
                 "max_num_seqs": 5,
                 "max_model_len": 32768,
                 "mm_processor_cache_gb": 0,
-                "default_sampling_params": {"max_tokens": 150, "ignore_eos": False},
+                # Function expansion includes a 300-word generation case with
+                # a 200-word minimum. A 150-token cap deterministically
+                # truncated that case to 113 words in AMD build #11997.
+                "default_sampling_params": {"max_tokens": 512, "ignore_eos": False},
             },
             {
                 "stage_id": 1,

@@ -60,6 +60,17 @@ def test_qwen3_ci_overlay_pins_only_the_talker_sampling_seed(monkeypatch: pytest
     assert "seed" not in production_talker["default_sampling_params"]
 
 
+def test_qwen3_ci_overlay_retains_long_output_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_stage_config_helper(monkeypatch)
+    generated = Path(module.get_deploy_config_path("ci/qwen3_omni_moe.yaml"))
+    overlay = yaml.safe_load(generated.read_text(encoding="utf-8"))
+    thinker = next(stage for stage in overlay["stages"] if stage["stage_id"] == 0)
+    function_source = FUNCTION_TEST.read_text(encoding="utf-8")
+
+    assert thinker["default_sampling_params"]["max_tokens"] == 512
+    assert "assert word_count >= 200" in function_source
+
+
 def test_qwen3_ci_overlay_reserves_rocm_thinker_encoder_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load_stage_config_helper(monkeypatch)
     generated = Path(module.get_deploy_config_path("ci/qwen3_omni_moe.yaml"))

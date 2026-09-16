@@ -79,11 +79,12 @@ def capture_processes(output: Path) -> None:
     _write(output, result.stdout)
 
 
-def _process_identities(text: str) -> dict[str, str]:
+def _process_identities(text: str, ignored_pids: set[int] | None = None) -> dict[str, str]:
+    ignored_pids = ignored_pids or set()
     identities: dict[str, str] = {}
     for line in text.splitlines():
         fields = line.split(None, 8)
-        if len(fields) != 9 or fields[8] == "ps":
+        if len(fields) != 9 or fields[8] == "ps" or int(fields[0]) in ignored_pids:
             continue
         identity = "|".join((fields[0], *fields[2:7]))
         identities[identity] = line
@@ -94,7 +95,7 @@ def check_cleanup(before: Path, after: Path, output: Path, settle_seconds: float
     time.sleep(settle_seconds)
     capture_processes(after)
     baseline = _process_identities(before.read_text(encoding="utf-8"))
-    current = _process_identities(after.read_text(encoding="utf-8"))
+    current = _process_identities(after.read_text(encoding="utf-8"), ignored_pids={os.getpid()})
     leaked = [line for identity, line in current.items() if identity not in baseline]
     status = "status=PASS leaked_processes=0" if not leaked else "status=FAIL leaked_processes_detected=1"
     _write(output, "\n".join([*leaked, status]) + "\n")

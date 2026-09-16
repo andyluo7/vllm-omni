@@ -321,6 +321,24 @@ steps:
       tail -n 100 "$$ROCM_DISTRIBUTED_ARTIFACT_DIR/pytest.log" >
       "$$ROCM_DISTRIBUTED_ARTIFACT_DIR/pytest-summary.txt"
     - |
+      python3 - <<'PY' | tee "$$ROCM_DISTRIBUTED_ARTIFACT_DIR/pytest-result.txt"
+      import os
+      from xml.etree import ElementTree
+
+      report = ElementTree.parse(
+          os.path.join(os.environ["ROCM_DISTRIBUTED_ARTIFACT_DIR"], "pytest.xml")
+      ).getroot()
+      suites = [report] if report.tag == "testsuite" else report.findall("./testsuite")
+      tests = sum(int(suite.attrib.get("tests", 0)) for suite in suites)
+      skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
+      failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
+      errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
+      executed = tests - skipped
+      print(f"tests={tests} skipped={skipped} executed={executed} failures={failures} errors={errors}")
+      if tests == 0 or executed == 0 or failures or errors:
+          raise SystemExit("pytest did not produce a clean, non-empty executed test set")
+      PY
+    - |
       sleep 5
       ps -eo pid=,ppid=,lstart=,stat=,comm= > "$$ROCM_DISTRIBUTED_ARTIFACT_DIR/processes-after.txt"
       awk '
@@ -388,6 +406,24 @@ steps:
     - >-
       tail -n 100 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest.log" >
       "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-summary.txt"
+    - |
+      python3 - <<'PY' | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-result.txt"
+      import os
+      from xml.etree import ElementTree
+
+      report = ElementTree.parse(
+          os.path.join(os.environ["ROCM_TINY_BASE_ARTIFACT_DIR"], "pytest.xml")
+      ).getroot()
+      suites = [report] if report.tag == "testsuite" else report.findall("./testsuite")
+      tests = sum(int(suite.attrib.get("tests", 0)) for suite in suites)
+      skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
+      failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
+      errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
+      executed = tests - skipped
+      print(f"tests={tests} skipped={skipped} executed={executed} failures={failures} errors={errors}")
+      if tests == 0 or executed == 0 or failures or errors:
+          raise SystemExit("pytest did not produce a clean, non-empty executed test set")
+      PY
     - |
       sleep 5
       ps -eo pid=,ppid=,lstart=,stat=,comm= > "$$ROCM_TINY_BASE_ARTIFACT_DIR/processes-after.txt"

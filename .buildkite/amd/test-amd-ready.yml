@@ -373,16 +373,19 @@ steps:
     # backend-agnostic, so select Torch SDPA explicitly and run one xdist worker.
     # Give MIOpen a per-job writable FindDb/cache and enable incremental tuning:
     # LTX2 needs a real solver search, while sharing the database made concurrent
-    # jobs corrupt it. Most pipelines
-    # need fused SDPA to avoid excessive memory use and retain determinism; the
-    # three Qwen pipelines need math SDPA for their same-seed checks. Partitioning
-    # by model keeps every CUDA-equivalent case while applying math SDPA narrowly.
+    # jobs corrupt it. Most pipelines need fused SDPA to avoid excessive memory
+    # use and retain determinism. LongCat edit and Flux Kontext additionally need
+    # deterministic MIOpen convolution selection for their image-input paths, and
+    # the three Qwen pipelines need math SDPA for their same-seed checks.
+    # Partitioning by model keeps every CUDA-equivalent case while applying each
+    # ROCm workaround narrowly.
     - export VLLM_ROCM_USE_AITER=0
     - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
     - export MIOPEN_FIND_MODE=3
     - export MIOPEN_FIND_ENFORCE=3
     - export MIOPEN_USER_DB_PATH="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID/db"
     - export MIOPEN_CUSTOM_CACHE_DIR="/tmp/vllm-omni-miopen-$$BUILDKITE_JOB_ID/cache"
+    - export VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS=0
     - export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=0
     - >-
       export PYTHONPATH="$$BUILDKITE_BUILD_CHECKOUT_PATH/.buildkite/amd/rocm-ci-sitecustomize:$${PYTHONPATH:-}"
@@ -418,6 +421,8 @@ steps:
       print(f"miopen_find_enforce={os.environ.get('MIOPEN_FIND_ENFORCE', 'unset')}")
       print(f"miopen_user_db_path={os.environ.get('MIOPEN_USER_DB_PATH', 'unset')}")
       print(f"miopen_custom_cache_dir={os.environ.get('MIOPEN_CUSTOM_CACHE_DIR', 'unset')}")
+      print(f"default_cudnn_benchmark={torch.backends.cudnn.benchmark}")
+      print(f"default_cudnn_deterministic={torch.backends.cudnn.deterministic}")
       print(f"default_flash_sdp_enabled={torch.backends.cuda.flash_sdp_enabled()}")
       print(f"default_mem_efficient_sdp_enabled={torch.backends.cuda.mem_efficient_sdp_enabled()}")
       print(f"default_math_sdp_enabled={torch.backends.cuda.math_sdp_enabled()}")
@@ -426,15 +431,44 @@ steps:
       print(f"job_started_at={os.environ.get('BUILDKITE_JOB_STARTED_AT', 'unknown')}")
       PY
     - >-
-      timeout --signal=TERM --kill-after=1m 40m
+      timeout --signal=TERM --kill-after=1m 30m
       pytest -s -v -ra -n 1
       tests/model_tests/diffusion/
       -m 'core_model and cuda'
-      -k 'not (QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline)'
+      -k 'not (LTX2Pipeline or LongCatImageEditPipeline or FluxKontextPipeline or QwenImagePipeline or QwenImageEditPipeline or QwenImageEditPlusPipeline)'
       --run-level "core_model"
       --durations=0
       --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.xml"
       2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.log"
+    - export VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS=1
+    - |
+      python3 - <<'PY' >> "$$ROCM_TINY_BASE_ARTIFACT_DIR/environment.txt"
+      import torch
+
+      print(f"deterministic_conv_cudnn_benchmark={torch.backends.cudnn.benchmark}")
+      print(f"deterministic_conv_cudnn_deterministic={torch.backends.cudnn.deterministic}")
+      PY
+    - >-
+      timeout --signal=TERM --kill-after=1m 15m
+      pytest -s -v -ra -n 1
+      tests/model_tests/diffusion/
+      -m 'core_model and cuda'
+      -k 'LongCatImageEditPipeline or FluxKontextPipeline'
+      --run-level "core_model"
+      --durations=0
+      --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-deterministic-conv.xml"
+      2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-deterministic-conv.log"
+    - export VLLM_OMNI_ROCM_CI_DETERMINISTIC_CONVOLUTIONS=0
+    - >-
+      timeout --signal=TERM --kill-after=1m 10m
+      pytest -s -v -ra -n 1
+      tests/model_tests/diffusion/
+      -m 'core_model and cuda'
+      -k 'LTX2Pipeline'
+      --run-level "core_model"
+      --durations=0
+      --junitxml="$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-ltx2.xml"
+      2>&1 | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-ltx2.log"
     - export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1
     - |
       python3 - <<'PY' >> "$$ROCM_TINY_BASE_ARTIFACT_DIR/environment.txt"
@@ -457,9 +491,13 @@ steps:
     - >-
       {
       echo '=== default fused SDPA partition ===';
-      tail -n 75 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.log";
+      tail -n 50 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-default.log";
+      echo '=== deterministic convolution partition ===';
+      tail -n 50 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-deterministic-conv.log";
+      echo '=== LTX2 FP32 vocoder partition ===';
+      tail -n 50 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-ltx2.log";
       echo '=== Qwen math SDPA partition ===';
-      tail -n 75 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-qwen-math.log";
+      tail -n 50 "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-qwen-math.log";
       } > "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-summary.txt"
     - |
       python3 - <<'PY' | tee "$$ROCM_TINY_BASE_ARTIFACT_DIR/pytest-result.txt"
@@ -469,6 +507,8 @@ steps:
       artifact_dir = os.environ["ROCM_TINY_BASE_ARTIFACT_DIR"]
       report_paths = [
           os.path.join(artifact_dir, "pytest-default.xml"),
+          os.path.join(artifact_dir, "pytest-deterministic-conv.xml"),
+          os.path.join(artifact_dir, "pytest-ltx2.xml"),
           os.path.join(artifact_dir, "pytest-qwen-math.xml"),
       ]
       totals = {"tests": 0, "skipped": 0, "executed": 0, "failures": 0, "errors": 0}

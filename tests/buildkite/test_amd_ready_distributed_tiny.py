@@ -86,12 +86,26 @@ def test_tiny_base_job_matches_current_cuda_scope() -> None:
     assert "export MIOPEN_FIND_MODE=NORMAL" in step["commands"]
     assert "export MIOPEN_DEBUG_DISABLE_FIND_DB=1" in step["commands"]
     assert "MIOPEN_CUSTOM_CACHE_DIR=" in commands
+    assert "export VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA=1" in step["commands"]
+    assert "rocm-ci-sitecustomize" in commands
     assert "diffusion_attention_backend=" in commands
     assert "miopen_find_mode=" in commands
     assert "miopen_find_db_disabled=" in commands
     assert "miopen_custom_cache_dir=" in commands
+    assert "flash_sdp_enabled=" in commands
+    assert "mem_efficient_sdp_enabled=" in commands
+    assert "math_sdp_enabled=" in commands
     assert "tests/model_tests/diffusion/" in argv
     assert argv[argv.index("-m") + 1] == "core_model and cuda"
     assert argv[argv.index("--run-level") + 1] == "core_model"
     assert argv[argv.index("-n") + 1] == "1"
     assert "timeout --signal=TERM --kill-after=1m 50m" in command
+
+
+def test_rocm_sitecustomize_forces_math_sdpa_only() -> None:
+    source = Path(".buildkite/amd/rocm-ci-sitecustomize/sitecustomize.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("VLLM_OMNI_ROCM_CI_FORCE_MATH_SDPA")' in source
+    assert "torch.backends.cuda.enable_flash_sdp(False)" in source
+    assert "torch.backends.cuda.enable_mem_efficient_sdp(False)" in source
+    assert "torch.backends.cuda.enable_math_sdp(True)" in source
+    assert "torch.use_deterministic_algorithms" not in source

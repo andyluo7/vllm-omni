@@ -11,6 +11,7 @@ pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
 
 AMD_MERGE_PIPELINE = Path(".buildkite/amd/test-amd-merge.yml")
 AMD_NIGHTLY_PIPELINE = Path(".buildkite/amd/test-amd-nightly.yml")
+AMD_READY_PIPELINE = Path(".buildkite/amd/test-amd-ready.yml")
 
 
 def _find_step(label: str, pipeline_path: Path = AMD_MERGE_PIPELINE) -> dict:
@@ -53,3 +54,13 @@ def test_qwen3_accuracy_defers_artifact_path_expansion() -> None:
     assert '"$${BUILDKITE_BUILD_CHECKOUT_PATH:?}"' in staging_command
     assert '"$$artifact_dir"' in staging_command
     assert step["artifact_paths"] == ["tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json"]
+
+
+def test_ready_diffusion_cpu_suite_is_sharded() -> None:
+    step = _find_step("Simple · Diffusion Test · Shard %N/%t", AMD_READY_PIPELINE)
+    pytest_command = next(command for command in step["commands"] if "pytest" in command)
+
+    assert step["parallelism"] == 4
+    assert step["timeout_in_minutes"] == 45
+    assert "--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT" in pytest_command
+    assert "--shard-id=$$BUILDKITE_PARALLEL_JOB" in pytest_command

@@ -30,17 +30,18 @@ steps:
         - export VLLM_ROCM_USE_AITER=0
         - "pytest -sv tests/model_executor/models/test_omni_processing.py -m 'core_model and cpu and omni'"
 
-    - label: "Simple · Diffusion Test"
+    - label: "Simple · Diffusion Test · Shard %N/%t"
       agent_pool: mi300_1
+      parallelism: 4
       depends_on: amd-build
       mirror_hardwares: [amdproduction]
       grade: Blocking
-      timeout_in_minutes: 90
+      timeout_in_minutes: 45
       commands:
         - export VLLM_ROCM_USE_AITER=0
         # ignore test_teacache_extractors.py because it use rocm gemm kernel from vLLM
         # that is not supported on CPU
-        - "pytest -sv tests/diffusion -m 'core_model and cpu'  --ignore=tests/diffusion/cache/test_teacache_extractors.py"
+        - "pytest -sv tests/diffusion -m 'core_model and cpu' --ignore=tests/diffusion/cache/test_teacache_extractors.py --num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --shard-id=$$BUILDKITE_PARALLEL_JOB"
 
     - label: "Simple · Engine&Entrypoints Test"
       agent_pool: mi300_1

@@ -34,6 +34,7 @@ from tests.model_executor.models.registry import (
 )
 from vllm_omni.config import OmniModelConfig
 from vllm_omni.model_executor.models.registry import OmniModelRegistry
+from vllm_omni.platforms import current_omni_platform
 
 
 def random_image(rng: np.random.RandomState, min_wh: int, max_wh: int):
@@ -307,6 +308,10 @@ def _test_processing_correctness_one(
         )
 
 
+@pytest.mark.skipif(
+    current_omni_platform.is_rocm(),
+    reason="HF multimodal processor matrix exceeds the AMD CI time budget",
+)
 @pytest.mark.core_model
 @pytest.mark.omni
 @pytest.mark.cpu

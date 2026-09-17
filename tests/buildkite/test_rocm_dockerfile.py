@@ -12,6 +12,7 @@ AMD_TEMPLATE = REPO_ROOT / ".buildkite/amd/test-template-amd-omni.j2"
 AMD_BUILD_SCRIPT = REPO_ROOT / ".buildkite/amd/scripts/build-ci-image.sh"
 CI_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.ci"
 ROCM_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.rocm"
+ROCM_DOCKERIGNORE = REPO_ROOT / "docker/Dockerfile.rocm.dockerignore"
 
 
 def _docker_arg(path: Path, name: str) -> str:
@@ -90,6 +91,16 @@ def test_rocm_source_copy_preserves_dependency_cache() -> None:
     assert not any(
         line.startswith(("RUN ", "COPY ", "ADD ")) for line in lines[source_copy_index + 1 : test_stage_index]
     )
+
+
+def test_rocm_build_context_excludes_git_history() -> None:
+    patterns = {
+        line.strip()
+        for line in ROCM_DOCKERIGNORE.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert ".git" in patterns
 
 
 def test_rocm_source_ref_tracks_ci_vllm_release() -> None:

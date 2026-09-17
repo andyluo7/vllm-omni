@@ -21,6 +21,7 @@ fi
 
 dependency_files=(
     "$DOCKERFILE"
+    "${DOCKERFILE}.dockerignore"
     pyproject.toml
     setup.py
     tools/install_torchcodec_rocm.sh

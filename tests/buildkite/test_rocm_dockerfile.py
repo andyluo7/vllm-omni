@@ -60,6 +60,7 @@ def test_amd_cache_key_tracks_dependency_inputs_and_architecture() -> None:
 
     for cache_input in (
         "docker/Dockerfile.rocm",
+        "${DOCKERFILE}.dockerignore",
         "pyproject.toml",
         "setup.py",
         "requirements",
@@ -76,6 +77,19 @@ def test_amd_build_uses_rocm_dockerfile_defaults() -> None:
     for arg_name in ("BASE_IMAGE", "USE_NIGHTLY_BUILD"):
         assert f"--build-arg {arg_name}" not in build_script
         assert f"--build-arg={arg_name}" not in build_script
+
+
+def test_rocm_source_copy_preserves_dependency_cache() -> None:
+    dockerfile = ROCM_DOCKERFILE.read_text(encoding="utf-8")
+    lines = dockerfile.splitlines()
+    source_copy_index = _line_index(lines, "COPY --link . .")
+    test_stage_index = _line_index(lines, "FROM base AS test")
+
+    assert "FROM deps AS base" in lines[:source_copy_index]
+    assert any('-e ".[dev]"' in line for line in lines[:source_copy_index])
+    assert not any(
+        line.startswith(("RUN ", "COPY ", "ADD ")) for line in lines[source_copy_index + 1 : test_stage_index]
+    )
 
 
 def test_rocm_source_ref_tracks_ci_vllm_release() -> None:

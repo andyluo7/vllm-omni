@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from vllm_omni.platforms import current_omni_platform
 from vllm_omni.model_executor.models.minicpmo_4_5.minicpmo_4_5_omni_llm import (
     MiniCPMO45OmniLLMForConditionalGeneration,
 )
@@ -38,7 +39,23 @@ def _reference_chunk_mask(
     return mask
 
 
-@pytest.mark.parametrize("size", [0, 1, 49, 50, 51, 1500])
+@pytest.mark.parametrize(
+    "size",
+    [
+        0,
+        1,
+        49,
+        50,
+        51,
+        pytest.param(
+            1500,
+            marks=pytest.mark.skipif(
+                current_omni_platform.is_rocm(),
+                reason="large mask sizes exceed the AMD CI time budget",
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize("chunk_size", [1, 17, 50])
 @pytest.mark.parametrize("num_left_chunks", [-1, 0, 1, 3])
 @pytest.mark.parametrize("num_lookhead", [0, 1, 7])

@@ -9,6 +9,7 @@ pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AMD_TEMPLATE = REPO_ROOT / ".buildkite/amd/test-template-amd-omni.j2"
+AMD_BUILD_SCRIPT = REPO_ROOT / ".buildkite/amd/scripts/build-ci-image.sh"
 CI_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.ci"
 ROCM_DOCKERFILE = REPO_ROOT / "docker/Dockerfile.rocm"
 
@@ -42,16 +43,39 @@ def test_rocm_defaults_to_prebuilt_base_image() -> None:
     assert _docker_arg(ROCM_DOCKERFILE, "USE_NIGHTLY_BUILD") == "0"
 
 
-def test_amd_build_uses_rocm_dockerfile_defaults() -> None:
+def test_amd_build_uses_registry_cache() -> None:
     template = AMD_TEMPLATE.read_text(encoding="utf-8")
-    build_commands = [line.strip() for line in template.splitlines() if '"docker build ' in line]
+    script_command = '"bash .buildkite/amd/scripts/build-ci-image.sh"'
+    script = AMD_BUILD_SCRIPT.read_text(encoding="utf-8")
 
-    assert len(build_commands) == 1, f"expected one AMD image build command, found {len(build_commands)}"
-    build_command = build_commands[0]
-    assert "-f docker/Dockerfile.rocm" in build_command
+    assert template.count(script_command) == 1
+    assert "docker buildx build --push" in script
+    assert '--cache-from "type=registry,ref=${CACHE_REF}"' in script
+    assert '--cache-to "type=registry,ref=${CACHE_REF}' in script
+    assert "mode=max" in script
+
+
+def test_amd_cache_key_tracks_dependency_inputs_and_architecture() -> None:
+    script = AMD_BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    for cache_input in (
+        "docker/Dockerfile.rocm",
+        "pyproject.toml",
+        "setup.py",
+        "requirements",
+        "tools/install_torchcodec_rocm.sh",
+        "ROCM_ARCH",
+    ):
+        assert cache_input in script
+
+
+def test_amd_build_uses_rocm_dockerfile_defaults() -> None:
+    build_script = AMD_BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'DOCKERFILE="docker/Dockerfile.rocm"' in build_script
     for arg_name in ("BASE_IMAGE", "USE_NIGHTLY_BUILD"):
-        assert f"--build-arg {arg_name}" not in build_command
-        assert f"--build-arg={arg_name}" not in build_command
+        assert f"--build-arg {arg_name}" not in build_script
+        assert f"--build-arg={arg_name}" not in build_script
 
 
 def test_rocm_source_ref_tracks_ci_vllm_release() -> None:

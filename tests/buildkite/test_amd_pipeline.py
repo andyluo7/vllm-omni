@@ -62,14 +62,23 @@ def test_qwen3_accuracy_defers_artifact_path_expansion() -> None:
     assert step["artifact_paths"] == ["tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json"]
 
 
-def test_ready_diffusion_cpu_suite_is_sharded() -> None:
-    step = _find_step("Simple · Diffusion Test · Shard %N/%t", AMD_READY_PIPELINE)
+@pytest.mark.parametrize("pipeline_path", [AMD_READY_PIPELINE, AMD_MERGE_PIPELINE], ids=["ready", "merge"])
+def test_diffusion_cpu_suite_is_sharded_and_pi05_isolated(pipeline_path: Path) -> None:
+    step = _find_step("Simple · Diffusion Test · Shard %N/%t", pipeline_path)
     pytest_command = next(command for command in step["commands"] if "pytest" in command)
 
     assert step["parallelism"] == 4
     assert step["timeout_in_minutes"] == 45
+    assert "--ignore=tests/diffusion/models/pi05/test_pi05_units.py" in pytest_command
     assert "--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT" in pytest_command
     assert "--shard-id=$$BUILDKITE_PARALLEL_JOB" in pytest_command
+
+    pi05_step = _find_step("Simple · Pi0.5 CPU Test", pipeline_path)
+    assert pi05_step["grade"] == "Blocking"
+    assert pi05_step["timeout_in_minutes"] == 45
+    pi05_command = next(command for command in pi05_step["commands"] if "pytest" in command)
+    assert "tests/diffusion/models/pi05/test_pi05_units.py" in pi05_command
+    assert "--num-shards" not in pi05_command
 
 
 def test_z_image_merge_timeout_covers_cold_aiter_compile() -> None:

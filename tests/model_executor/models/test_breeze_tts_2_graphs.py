@@ -4,11 +4,10 @@
 
 import pytest
 import torch
+from tests.helpers.mark import hardware_test
 from transformers import LlamaConfig, T5Gemma2TextConfig
 from transformers.models.t5gemma2.modeling_t5gemma2 import T5Gemma2TextEncoder
 from vllm.platforms import current_platform
-
-from tests.helpers.mark import hardware_test
 from vllm_omni.model_executor.models.breeze_tts_2.depth_decoder import BreezeDepthDecoder, sample_logits
 from vllm_omni.model_executor.models.breeze_tts_2.modeling_breeze import BreezeForConditionalGeneration
 from vllm_omni.model_executor.models.breeze_tts_2.text_encoder_graph import (
@@ -241,6 +240,7 @@ def test_depth_graph_buckets_bound_shapes_and_preserve_requests(full_precision_m
     seeds[0], seeds[-1] = 2**63 + 17, 2**64 - 1
     generators = [torch.Generator(device="cuda").manual_seed(seed) for seed in seeds]
     reference_generators = [torch.Generator(device="cuda").manual_seed(seed) for seed in seeds]
+    captures_generator_state = current_platform.is_cuda() and hasattr(torch.cuda.CUDAGraph, "register_generator_state")
 
     expected_greedy = torch.cat(
         [
@@ -314,7 +314,7 @@ def test_depth_graph_buckets_bound_shapes_and_preserve_requests(full_precision_m
             branches = 2 if guidance_scale != 1 else 1
             graph_key = (request_bucket * branches, branches, temperature == 0)
             with monkeypatch.context() as rng_guard:
-                if temperature > 0 and graph_key in depth._graphs:
+                if temperature > 0 and graph_key in depth._graphs and captures_generator_state:
                     # A warmed replay must generate noise within the CUDA
                     # graph, without dispatching new RNG kernels from Python.
                     rng_guard.setattr(torch.Tensor, "exponential_", reject_eager_noise)
@@ -349,7 +349,7 @@ def test_depth_graph_buckets_bound_shapes_and_preserve_requests(full_precision_m
     expected_keys.update((batch, 2, greedy) for batch in (2, 8, 16, 32) for greedy in (False, True))
     assert set(depth._graphs) == expected_keys
     for (batch_bucket, branches, greedy), entry in depth._graphs.items():
-        if greedy:
+        if greedy or not captures_generator_state:
             assert entry.noise_generators is None
         else:
             assert entry.noise_generators is not None

@@ -322,9 +322,7 @@ def test_collect_memory_results_filters_nested_worker_responses() -> None:
         {"probe": _OFFLOAD_STATE_PROBE, "operation": "snapshot"},
     ]
 
-    assert _collect_memory_results(value, "reset") == [
-        {"probe": _OFFLOAD_MEMORY_PROBE, "operation": "reset"}
-    ]
+    assert _collect_memory_results(value, "reset") == [{"probe": _OFFLOAD_MEMORY_PROBE, "operation": "reset"}]
     assert _collect_memory_results(value, "snapshot") == [
         {
             "probe": _OFFLOAD_MEMORY_PROBE,

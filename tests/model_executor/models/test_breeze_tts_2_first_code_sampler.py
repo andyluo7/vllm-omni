@@ -4,8 +4,9 @@
 
 import pytest
 import torch
-from tests.helpers.mark import hardware_test
 from vllm.platforms import current_platform
+
+from tests.helpers.mark import hardware_test
 from vllm_omni.model_executor.models.breeze_tts_2.depth_decoder import sample_logits
 from vllm_omni.model_executor.models.breeze_tts_2.first_code_sampler import BreezeFirstCodeSampler
 

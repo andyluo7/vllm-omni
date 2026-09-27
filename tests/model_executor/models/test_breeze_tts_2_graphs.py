@@ -9,7 +9,11 @@ from transformers.models.t5gemma2.modeling_t5gemma2 import T5Gemma2TextEncoder
 from vllm.platforms import current_platform
 
 from tests.helpers.mark import hardware_test
-from vllm_omni.model_executor.models.breeze_tts_2.depth_decoder import BreezeDepthDecoder, sample_logits
+from vllm_omni.model_executor.models.breeze_tts_2.depth_decoder import (
+    BreezeDepthDecoder,
+    _depth_layer_compile_options,
+    sample_logits,
+)
 from vllm_omni.model_executor.models.breeze_tts_2.modeling_breeze import BreezeForConditionalGeneration
 from vllm_omni.model_executor.models.breeze_tts_2.text_encoder_graph import (
     BreezeTextEncoderCompiled,
@@ -17,6 +21,17 @@ from vllm_omni.model_executor.models.breeze_tts_2.text_encoder_graph import (
 )
 
 pytestmark = [pytest.mark.core_model]
+
+
+@pytest.mark.cpu
+@pytest.mark.parametrize(("is_rocm", "expected"), [(True, False), (False, True)])
+def test_depth_layer_compile_options(monkeypatch, is_rocm: bool, expected: bool) -> None:
+    monkeypatch.setattr(current_platform, "is_rocm", lambda: is_rocm)
+
+    assert _depth_layer_compile_options() == {
+        "epilogue_fusion": False,
+        "max_autotune": expected,
+    }
 
 
 @pytest.fixture

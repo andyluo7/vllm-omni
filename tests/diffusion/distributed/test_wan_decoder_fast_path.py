@@ -25,6 +25,7 @@ from diffusers.models.autoencoders.autoencoder_kl_wan import (
     WanCausalConv3d,
     WanDecoder3d,
 )
+
 from vllm_omni.diffusion.distributed.autoencoders.wan_decoder_fast_path import (
     install_wan_decoder_fast_path,
 )

@@ -13,6 +13,7 @@ from vllm_omni.model_executor.stage_input_processors.cosyvoice3 import (
     text2flow_full_payload,
     text2flow_token_only,
 )
+from vllm_omni.outputs.mm_outputs import MultimodalPayload
 
 pytestmark = [pytest.mark.core_model, pytest.mark.cpu]
 
@@ -119,6 +120,24 @@ def test_text2flow_full_payload_does_not_send_codec_ids():
     assert "codes" not in payload
     assert "next_stage_prompt_len" not in payload["meta"]
     assert torch.equal(payload["embed"]["speech_token"], torch.tensor([[1, 2]], dtype=torch.long))
+
+
+def test_text2flow_full_payload_accepts_structured_multimodal_payload():
+    speech_token = torch.tensor([[1, 2]], dtype=torch.long)
+    payload = text2flow_full_payload(
+        None,
+        MultimodalPayload(
+            tensors={
+                "embed.speech_token": speech_token,
+                "codes.audio": torch.tensor([7, 8, 9], dtype=torch.long),
+            }
+        ),
+        SimpleNamespace(external_req_id="req-structured"),
+    )
+
+    assert payload is not None
+    assert "codes" not in payload
+    assert torch.equal(payload["embed"]["speech_token"], speech_token)
 
 
 def test_talker2code2wav_async_chunk_final_payload_uses_absolute_token_offset():

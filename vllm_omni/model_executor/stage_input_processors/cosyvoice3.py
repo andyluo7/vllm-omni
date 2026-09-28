@@ -347,9 +347,9 @@ def text2flow_full_payload(
     """
     del transfer_manager
     rid = getattr(request, "external_req_id", None) or getattr(request, "request_id", "?")
-    if not isinstance(pooling_output, dict):
+    if not isinstance(pooling_output, Mapping):
         logger.warning(
-            "cosyvoice3.text2flow_full_payload: pooling_output not a dict "
+            "cosyvoice3.text2flow_full_payload: pooling_output not a mapping "
             "(type=%s) for req=%s; consumer wait gate may hang.",
             type(pooling_output).__name__,
             rid,
@@ -360,7 +360,7 @@ def text2flow_full_payload(
         v = pooling_output.get(f"embed.{key}")
         if v is None:
             nested = pooling_output.get("embed")
-            if isinstance(nested, dict):
+            if isinstance(nested, Mapping):
                 v = nested.get(key)
         if isinstance(v, torch.Tensor) and v.numel() > 0:
             embed_out[key] = v

@@ -131,6 +131,8 @@ def _junit_counts(paths: list[Path]) -> dict[str, int]:
         failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
         errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
         skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
+        if min(tests, failures, errors, skipped) < 0 or failures + errors + skipped > tests:
+            raise RuntimeError("pytest JUnit report contains inconsistent result counts")
         totals["selected"] += tests
         totals["passed"] += tests - failures - errors - skipped
         totals["failed"] += failures + errors

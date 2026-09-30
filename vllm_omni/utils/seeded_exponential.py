@@ -12,6 +12,7 @@ every value and every generator state afterwards matches the per-request loop.
 """
 
 import torch
+from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 
 
@@ -109,9 +110,15 @@ def fill_exponential_rows(out: torch.Tensor, generators: list, rows: list[int] |
 
 
 def batched_seeded_exponential_supported(q: torch.Tensor, generators: dict) -> bool:
-    """Whether ``fill_exponential_rows`` reproduces the per-row loop for ``q``."""
+    """Whether the NVIDIA CUDA kernel reproduces the per-row loop for ``q``.
+
+    ROCm tensors also report ``is_cuda``, but HIP uses a different distribution
+    implementation and cannot compile the CUDA libdevice transform above.
+    Keep those draws on Torch's original per-row path, including RNG state.
+    """
     return (
-        len(generators) > 1
+        current_platform.is_cuda()
+        and len(generators) > 1
         and q.is_cuda
         and q.dtype == torch.float32
         and q.dim() == 2

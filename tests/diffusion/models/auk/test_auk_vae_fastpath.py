@@ -19,6 +19,22 @@ from vllm_omni.platforms import current_omni_platform
 pytestmark = [pytest.mark.core_model]
 
 
+@pytest.fixture(autouse=True)
+def _bound_cpu_decode_threads(request):
+    if request.node.get_closest_marker("cpu") is None:
+        yield
+        return
+    # These narrow convolutions run in shared CI pods. A host-sized Torch
+    # pool spends more time coordinating workers than decoding small clips.
+    previous_threads = torch.get_num_threads()
+    torch.set_num_threads(1)
+    print(f"AuK CPU decode threads: {previous_threads} -> {torch.get_num_threads()}")
+    try:
+        yield
+    finally:
+        torch.set_num_threads(previous_threads)
+
+
 def _small_vae() -> AuKVAE:
     torch.manual_seed(3)
     # Six halvings of the initial width must leave at least two channels.

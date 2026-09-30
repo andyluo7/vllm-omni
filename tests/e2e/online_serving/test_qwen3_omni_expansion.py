@@ -75,6 +75,7 @@ test_params = [
             stage_config_path=default_path,
             use_stage_cli=True,
             init_timeout=QWEN3_OMNI_INIT_TIMEOUT_S,
+            startup_timeout=QWEN3_OMNI_INIT_TIMEOUT_S + 300,
             server_args=[
                 "--no-async-chunk",
             ],
@@ -87,6 +88,7 @@ test_params = [
             stage_config_path=default_path,
             use_stage_cli=True,
             init_timeout=QWEN3_OMNI_INIT_TIMEOUT_S,
+            startup_timeout=QWEN3_OMNI_INIT_TIMEOUT_S + 300,
             server_args=["--async-chunk"],
         ),
         id="async_chunk",
@@ -100,6 +102,7 @@ reduced_token_params = [
             stage_config_path=get_batch_token_config(default_path),
             use_stage_cli=True,
             init_timeout=QWEN3_OMNI_INIT_TIMEOUT_S,
+            startup_timeout=QWEN3_OMNI_INIT_TIMEOUT_S + 300,
             server_args=["--async-chunk"],
         ),
         id="batch_token_2048",

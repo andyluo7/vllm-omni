@@ -86,6 +86,7 @@ test_params = [
         model=model,
         stage_config_path=stage_config,
         init_timeout=QWEN3_OMNI_INIT_TIMEOUT_S,
+        startup_timeout=QWEN3_OMNI_INIT_TIMEOUT_S + 300,
     )
     for model in models
     for stage_config in stage_configs

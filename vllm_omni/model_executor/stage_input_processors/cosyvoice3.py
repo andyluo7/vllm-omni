@@ -292,7 +292,9 @@ def talker2code2wav_async_chunk(
 # CONCAT across the (already trivial) per-request accumulator history so a
 # regression where decode unexpectedly re-emits them does not silently
 # duplicate the prefill tensor.  See mixin._FULL_PAYLOAD_REPLACE_KEYS.
-_FULL_PAYLOAD_REPLACE_KEYS: frozenset[str] = frozenset({"embed.speech_token", "embed.speech_feat", "embed.embedding"})
+_FULL_PAYLOAD_REPLACE_KEYS: frozenset[str] = frozenset(
+    {"embed.speech_token", "embed.speech_feat", "embed.embedding", "embed.speech_token_len"}
+)
 
 
 def text2flow_token_only(
@@ -356,7 +358,7 @@ def text2flow_full_payload(
         )
         return None
     embed_out: dict[str, Any] = {}
-    for key in ("speech_token", "speech_feat", "embedding"):
+    for key in ("speech_token", "speech_feat", "embedding", "speech_token_len"):
         v = pooling_output.get(f"embed.{key}")
         if v is None:
             nested = pooling_output.get("embed")

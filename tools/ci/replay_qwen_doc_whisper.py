@@ -147,19 +147,25 @@ def main() -> None:
     save()
     cases = [
         ("original_greedy_1", {}),
-        ("candidate_beam_5_1", {"beam_size": 5}),
+        ("candidate_fp32_greedy_1", {"fp16": False}),
+        ("candidate_temperature_fallback_1", {"temperature": (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)}),
         ("original_greedy_2", {}),
-        ("candidate_beam_5_2", {"beam_size": 5}),
+        ("candidate_fp32_greedy_2", {"fp16": False}),
+        ("candidate_temperature_fallback_2", {"temperature": (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)}),
     ]
     for name, extra in cases:
+        # Pin sampling for the temperature fallback, including its repeat.
+        # Greedy/FP32 cases retain the original temperature-zero settings.
+        torch.manual_seed(0)
         started = time.monotonic()
         try:
-            response = model.transcribe(str(args.output_dir / "audio.wav"), **SETTINGS, **extra)
+            response = model.transcribe(str(args.output_dir / "audio.wav"), **{**SETTINGS, **extra})
             similarity = media.cosine_similarity_text(response["text"].lower(), expected_text.lower())
             metadata["results"].append(
                 {
                     "name": name,
                     "extra_settings": extra,
+                    "torch_seed": 0,
                     "elapsed_seconds": time.monotonic() - started,
                     "similarity": similarity,
                     "passes_existing_quality_threshold": similarity > 0.8,

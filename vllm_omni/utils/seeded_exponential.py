@@ -74,10 +74,18 @@ def torch_exponential_policy(numel: int, device: torch.device) -> tuple[int, int
 def fill_exponential_rows(out: torch.Tensor, generators: list, rows: list[int] | None = None) -> torch.Tensor:
     """Draw ``out[rows[i]].exponential_(generator=generators[i])`` for all ``i`` in one launch.
 
-    ``out`` is a contiguous float32 CUDA matrix; ``rows`` defaults to
-    ``range(len(generators))``. ``None`` generators use the default CUDA
-    generator in order. Each generator is advanced exactly as torch would.
+    ``out`` is a contiguous float32 matrix. Without ``rows``, each generator
+    owns an equal contiguous slice of the flattened output (which may span
+    several codebook rows). ``None`` generators use the default generator in
+    order. NVIDIA uses the batched CUDA kernel; other platforms retain
+    ordered Torch draws, including direct Higgs Audio callers.
     """
+    if not current_platform.is_cuda():
+        targets = out.reshape(len(generators), -1) if rows is None else [out[row] for row in rows]
+        for target, generator in zip(targets, generators):
+            target.exponential_(generator=generator)
+        return out
+
     numel = int(out.shape[-1]) if rows is not None else int(out.numel()) // len(generators)
     device = out.device
     threads, increment = torch_exponential_policy(numel, device)

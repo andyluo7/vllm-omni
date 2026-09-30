@@ -22,8 +22,7 @@ from tests.model_tests.diffusion.task_runners import (
     run_and_validate_text_to_video_request,
 )
 
-# NOTE: pytest.mark.core_model / pytest.mark.full_model and hardware_marks(...)
-# are added dynamically by get_parametrized_options based on test requirements.
+# NOTE: Hardware and model type marks are added dynamically based on test requirements and model type.
 pytestmark = [pytest.mark.diffusion, pytest.mark.xdist]
 
 

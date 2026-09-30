@@ -14,6 +14,7 @@ import torch
 from tests.helpers.mark import hardware_test
 from vllm_omni.diffusion.models.auk.auk_vae import AuKVAE, LowPass, SnakeBeta, Upsample
 from vllm_omni.diffusion.models.auk.vae_cudagraph import AuKVAEDecodeGraph, plan_tiles
+from vllm_omni.platforms import current_omni_platform
 
 pytestmark = [pytest.mark.core_model]
 
@@ -44,6 +45,22 @@ def _reference_snake(module: SnakeBeta, x: torch.Tensor) -> torch.Tensor:
         alpha = torch.exp(alpha)
         beta = torch.exp(beta)
     return x + (1.0 / (beta + 1e-9)) * torch.sin(x * alpha).pow(2)
+
+
+def _assert_plain_graph_matches_eager(replay: torch.Tensor, eager: torch.Tensor) -> None:
+    assert replay.shape == eager.shape and replay.dtype == eager.dtype
+    assert torch.isfinite(replay).all() and torch.isfinite(eager).all()
+    error = (replay - eager).abs()
+    rms = error.square().mean().sqrt().item()
+    print(f"AuK plain graph: max_abs={error.max().item():.9g}, rms={rms:.9g}")
+    if current_omni_platform.is_rocm():
+        # MI300 build 13040 measured max_abs <= 1.64e-7 and RMS <= 4.13e-8.
+        # Bound both peak and aggregate FP32 error; near-zero samples must
+        # not hide behind a relative tolerance. NVIDIA retains bit parity.
+        torch.testing.assert_close(replay, eager, atol=1e-6, rtol=0.0)
+        assert rms <= 1e-7, rms
+    else:
+        assert torch.equal(replay, eager)
 
 
 @pytest.mark.cpu
@@ -220,17 +237,17 @@ def test_graph_replay_matches_eager_per_length() -> None:
     vae = _small_vae().to("cuda")
     wrapper = AuKVAEDecodeGraph(vae, max_graphs=2)
     pools = []
+    saved_outputs: list[tuple[torch.Tensor, torch.Tensor]] = []
     for frames in (6, 9, 6, 12, 6):
         latents = torch.randn(1, frames, vae.latent_dim, device="cuda")
         eager = vae.decode(latents)
         replay = wrapper(latents)
-        # Exact-length graphs replay the very same kernels: bit-identical,
-        # including after the generation was retired.
-        error = (replay - eager).abs()
-        print(
-            f"AuK plain graph frames={frames}: max_abs={error.max().item():.9g}, rms={error.square().mean().sqrt().item():.9g}"
-        )
-        assert torch.equal(replay, eager), frames
+        _assert_plain_graph_matches_eager(replay, eager)
+        # Returned waveforms own their storage and survive later replays
+        # and retirement of the generation that produced them.
+        for previous, snapshot in saved_outputs:
+            assert torch.equal(previous, snapshot)
+        saved_outputs.append((replay, replay.clone()))
         pools.append(wrapper._plain_pool)
     # The third distinct length found the cache full, so the whole generation
     # (6 and 9) was retired together with its pool rather than one graph at a
@@ -286,9 +303,7 @@ def test_compiled_buckets_replay_within_fusion_tolerance_and_leave_longer_clips_
     assert wrapper.tile_frames == 0
     long = torch.randn(1, 12, vae.latent_dim, device="cuda")
     replay, eager = wrapper(long), vae.decode(long)
-    error = (replay - eager).abs()
-    print(f"AuK long plain graph: max_abs={error.max().item():.9g}, rms={error.square().mean().sqrt().item():.9g}")
-    assert torch.equal(replay, eager)
+    _assert_plain_graph_matches_eager(replay, eager)
     assert wrapper.last_mode == "graph" and list(wrapper._cache) == [12]
 
 

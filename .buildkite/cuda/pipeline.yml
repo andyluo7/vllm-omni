@@ -1,9 +1,8 @@
-# Hook uploads this entry YAML; upload_pipeline.py --upload reads bootstrap-upload-steps.yml
-# and injects ``if`` by step ``key`` from skip-ci.
+# Temporary validation branch: run the exact retained-audio experiment only.
 steps:
-  - label: ":github: Resolve skip-ci & upload pipeline"
+  - label: "Upload Qwen Documentation Whisper replay"
     key: upload-ci-pipeline
     commands:
-      - "python3 .buildkite/common/scripts/upload_pipeline.py --upload .buildkite/cuda/bootstrap-upload-steps.yml"
+      - "python3 .buildkite/common/scripts/upload_pipeline.py --upload --all .buildkite/cuda/test-qwen-doc-whisper-replay.yml"
     agents:
       queue: "cpu_queue_premerge"

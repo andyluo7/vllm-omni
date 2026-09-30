@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 from shlex import split
+from xml.etree import ElementTree
 
 import pytest
 import yaml
@@ -52,8 +53,18 @@ def test_jobs_are_nonblocking_and_retain_evidence(label: str, contract: tuple[st
     assert len(pytest_commands) == 1
     assert "--collect-only" not in "\n".join(commands)
     assert "VLLM_CI_ALLOW_NO_TESTS" not in "\n".join(commands)
-    for evidence in ("environment.txt", "pytest.log", "pytest.xml", "pytest-summary.txt", "process-cleanup.txt"):
+    for evidence in (
+        "environment.txt",
+        "pytest.log",
+        "pytest.xml",
+        "pytest-summary.txt",
+        "pytest-result.txt",
+        "process-cleanup.txt",
+    ):
         assert evidence in "\n".join(commands)
+    result_command = next(command for command in commands if "rocm_ci_evidence.py pytest-result" in command)
+    assert '--xml "$$ROCM_CI_ARTIFACT_DIR/pytest.xml"' in result_command
+    assert '--log "$$ROCM_CI_ARTIFACT_DIR/pytest.log"' in result_command
 
 
 @pytest.mark.parametrize(
@@ -107,3 +118,61 @@ def test_evidence_process_identity_includes_start_time() -> None:
     process_table = "12 1 Mon Sep 15 10:00:00 2026 S python3\n13 1 Mon Sep 15 10:00:01 2026 S python3\n"
     rows = module._process_identities(process_table, ignored_pids={13})
     assert rows == {"12|Mon|Sep|15|10:00:00|2026": "12 1 Mon Sep 15 10:00:00 2026 S python3"}
+
+
+def _evidence_module():
+    spec = importlib.util.spec_from_file_location("rocm_ci_evidence", EVIDENCE_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_evidence_helper_reports_executed_and_deselected_counts(tmp_path: Path) -> None:
+    xml = tmp_path / "pytest.xml"
+    log = tmp_path / "pytest.log"
+    output = tmp_path / "pytest-result.txt"
+    xml.write_text(
+        '<testsuites><testsuite tests="3" failures="0" errors="0" skipped="1"/></testsuites>', encoding="utf-8"
+    )
+    log.write_text("2 passed, 1 skipped, 12 deselected\n", encoding="utf-8")
+
+    _evidence_module().summarize_pytest([xml], log, output)
+
+    assert output.read_text(encoding="utf-8") == (
+        "collected=15 selected=3 passed=2 failed=0 skipped=1 deselected=12 errors=0 executed=2\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        '<testsuite tests="0" failures="0" errors="0" skipped="0"/>',
+        '<testsuite tests="2" failures="0" errors="0" skipped="2"/>',
+        '<testsuite tests="2" failures="1" errors="0" skipped="0"/>',
+        '<testsuite tests="2" failures="0" errors="1" skipped="0"/>',
+        '<testsuite tests="1" failures="0" errors="0" skipped="2"/>',
+        '<testsuite tests="-1" failures="0" errors="0" skipped="0"/>',
+        "<unrecognized/>",
+    ],
+)
+def test_evidence_helper_rejects_unqualified_junit(tmp_path: Path, report: str) -> None:
+    xml = tmp_path / "pytest.xml"
+    log = tmp_path / "pytest.log"
+    xml.write_text(report, encoding="utf-8")
+    log.write_text("12 deselected\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError):
+        _evidence_module().summarize_pytest([xml], log, tmp_path / "pytest-result.txt")
+
+
+@pytest.mark.parametrize("report", [None, "<testsuite"])
+def test_evidence_helper_rejects_missing_or_malformed_junit(tmp_path: Path, report: str | None) -> None:
+    xml = tmp_path / "pytest.xml"
+    log = tmp_path / "pytest.log"
+    if report is not None:
+        xml.write_text(report, encoding="utf-8")
+    log.write_text("1 passed\n", encoding="utf-8")
+
+    with pytest.raises((FileNotFoundError, ElementTree.ParseError)):
+        _evidence_module().summarize_pytest([xml], log, tmp_path / "pytest-result.txt")

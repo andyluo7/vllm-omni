@@ -8,10 +8,12 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import re
 import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+from xml.etree import ElementTree
 
 
 def _write(path: Path, text: str) -> None:
@@ -103,6 +105,45 @@ def check_cleanup(before: Path, after: Path, output: Path, settle_seconds: float
         raise RuntimeError("processes created by the test remain after teardown")
 
 
+def _junit_counts(paths: list[Path]) -> dict[str, int]:
+    totals = {"selected": 0, "passed": 0, "failed": 0, "skipped": 0, "errors": 0}
+    for path in paths:
+        report = ElementTree.parse(path).getroot()
+        suites = [report] if report.tag == "testsuite" else report.findall("./testsuite")
+        tests = sum(int(suite.attrib.get("tests", 0)) for suite in suites)
+        failures = sum(int(suite.attrib.get("failures", 0)) for suite in suites)
+        errors = sum(int(suite.attrib.get("errors", 0)) for suite in suites)
+        skipped = sum(int(suite.attrib.get("skipped", 0)) for suite in suites)
+        if min(tests, failures, errors, skipped) < 0 or failures + errors + skipped > tests:
+            raise RuntimeError("pytest JUnit report contains inconsistent result counts")
+        totals["selected"] += tests
+        totals["passed"] += tests - failures - errors - skipped
+        totals["failed"] += failures + errors
+        totals["skipped"] += skipped
+        totals["errors"] += errors
+    return totals
+
+
+def summarize_pytest(xml_paths: list[Path], log: Path, output: Path) -> None:
+    totals = _junit_counts(xml_paths)
+    log_text = log.read_text(encoding="utf-8", errors="replace")
+    deselected_matches = [int(value) for value in re.findall(r"(\d+) deselected", log_text)]
+    deselected = max(deselected_matches, default=0)
+    collected = totals["selected"] + deselected
+    executed = totals["passed"] + totals["failed"]
+    result = (
+        f"collected={collected} selected={totals['selected']} passed={totals['passed']} "
+        f"failed={totals['failed']} skipped={totals['skipped']} deselected={deselected} "
+        f"errors={totals['errors']} executed={executed}"
+    )
+    _write(output, result + "\n")
+    print(result)
+    if collected == 0 or totals["selected"] == 0 or executed == 0:
+        raise RuntimeError("pytest did not produce a non-empty executed test set")
+    if totals["failed"] or totals["errors"]:
+        raise RuntimeError("pytest JUnit report contains failures or errors")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -112,6 +153,11 @@ def main() -> None:
 
     processes = subparsers.add_parser("processes")
     processes.add_argument("--output", type=Path, required=True)
+
+    pytest_result = subparsers.add_parser("pytest-result")
+    pytest_result.add_argument("--xml", type=Path, action="append", required=True)
+    pytest_result.add_argument("--log", type=Path, required=True)
+    pytest_result.add_argument("--output", type=Path, required=True)
 
     cleanup = subparsers.add_parser("cleanup")
     cleanup.add_argument("--before", type=Path, required=True)
@@ -124,6 +170,8 @@ def main() -> None:
         capture_environment(args.output)
     elif args.action == "processes":
         capture_processes(args.output)
+    elif args.action == "pytest-result":
+        summarize_pytest(args.xml, args.log, args.output)
     else:
         check_cleanup(args.before, args.after, args.output, args.settle_seconds)
 

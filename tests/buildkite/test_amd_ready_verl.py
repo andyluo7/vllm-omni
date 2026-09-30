@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 from shlex import split
 
@@ -60,6 +61,23 @@ def test_verl_job_preserves_cuda_source_command_and_cleanup_headroom() -> None:
     assert "tests/e2e/features/rlhf_test/test_verl_omni_e2e.py" in argv
     assert argv[:5] == ["timeout", "--signal=TERM", "--kill-after=1m", "20m", "pytest"]
     assert step["timeout_in_minutes"] > 20
+
+
+def test_ray_socket_directory_is_short_unique_and_cleaned() -> None:
+    commands = _find_step()["commands"]
+    setup = next(command for command in commands if command.startswith("export RAY_TMPDIR="))
+    cleanup = next(command for command in commands if command.startswith("trap "))
+    script = "\n".join([setup, cleanup, 'test -d "$RAY_TMPDIR"', 'printf "%s\\n" "$RAY_TMPDIR"']).replace("$$", "$")
+    paths = []
+    for _ in range(2):
+        result = subprocess.run(["bash", "-euc", script], capture_output=True, text=True, check=True, timeout=5)
+        path = Path(result.stdout.strip())
+        assert path.parent == Path("/tmp")
+        assert not path.exists()
+        socket_path = path / "ray/session_2026-09-30_23-46-27_335763_235/sockets/plasma_store"
+        assert len(str(socket_path).encode()) <= 107
+        paths.append(path)
+    assert paths[0] != paths[1]
 
 
 def test_evidence_helper_fails_closed_and_reports_selection(tmp_path: Path) -> None:

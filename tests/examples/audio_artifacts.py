@@ -25,9 +25,11 @@ def transcribe_example_audio(output_path: str, test_name: str, client_output: st
         "audio_file": source.name,
         "client_output": client_output,
         "asr_model": "small",
+        "asr_temperature": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        "asr_fallback_seed": 0,
     }
     try:
-        transcript = convert_audio_file_to_text(output_path)
+        transcript = convert_audio_file_to_text(output_path, temperature_fallback=True)
         evidence["transcript"] = transcript
         return transcript
     except BaseException as exc:

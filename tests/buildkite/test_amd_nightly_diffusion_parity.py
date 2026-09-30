@@ -100,6 +100,8 @@ def test_h100_quantization_uses_rocm_stable_attention_backend_and_budget() -> No
     command_text = "\n".join(commands)
 
     assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in commands
+    assert "export VLLM_OMNI_TEST_INIT_TIMEOUT=1800" in commands
+    assert "export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200" in commands
     assert "diffusion_attention_backend=$$DIFFUSION_ATTENTION_BACKEND" in command_text
     assert "timeout --signal=TERM --kill-after=1m 90m" in command_text
 

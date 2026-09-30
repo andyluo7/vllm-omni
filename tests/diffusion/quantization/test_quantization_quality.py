@@ -293,6 +293,12 @@ def _maybe_save_output(output_dir: Path | None, config: QualityTestConfig, label
 
 def _build_omni_kwargs(config: QualityTestConfig, model: str) -> dict:
     kwargs = {"model": model, "enforce_eager": True}
+    # Large offloaded checkpoints can spend the default startup budget loading
+    # weights before the warmup request. CI may supply bounded startup limits
+    # for both quality arms while ordinary runs retain Omni's defaults.
+    for name in ("init_timeout", "stage_init_timeout"):
+        if value := os.environ.get(f"VLLM_OMNI_TEST_{name.upper()}"):
+            kwargs[name] = int(value)
     if config.enable_cpu_offload:
         kwargs["enable_cpu_offload"] = True
     if config.diffusion_attention_backend is not None:
@@ -451,6 +457,24 @@ def _free_gpu_memory():
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.core_model
+@pytest.mark.cpu
+@pytest.mark.parametrize("timeouts", [None, {"init_timeout": 1800, "stage_init_timeout": 1200}])
+def test_quality_startup_budgets_apply_to_both_arms(monkeypatch, timeouts):
+    for name in ("init_timeout", "stage_init_timeout"):
+        variable = f"VLLM_OMNI_TEST_{name.upper()}"
+        monkeypatch.delenv(variable, raising=False)
+        if timeouts is not None:
+            monkeypatch.setenv(variable, str(timeouts[name]))
+
+    config = next(config for config in QUALITY_CONFIGS if config.id == "fp8_flux2_dev_text_encoder")
+    for model in (config.baseline_ref(), config.quantized_ref()):
+        kwargs = _build_omni_kwargs(config, model)
+        assert kwargs == {"model": model, "enforce_eager": True, "enable_cpu_offload": True, **(timeouts or {})}
+    assert config.max_lpips == {"H100": 0.15, "B200": 0.17}
+    assert config.quantization_ref() == {"text_encoder": "fp8", "transformer": None, "vae": None}
 
 
 @pytest.mark.core_model

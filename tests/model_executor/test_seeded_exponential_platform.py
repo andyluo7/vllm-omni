@@ -64,10 +64,12 @@ def test_torch_fallback_preserves_samples_and_generator_state(monkeypatch, seede
     try:
         for _ in range(5):
             torch.cuda.set_rng_state(expected_default)
-            expected = original(probs, expected_gens, use_fp64_gumbel)
+            # FP32 sampling divides probabilities in place. Give both paths
+            # the same untouched input on every step.
+            expected = original(probs.clone(), expected_gens, use_fp64_gumbel)
             expected_default = torch.cuda.get_rng_state()
             torch.cuda.set_rng_state(actual_default)
-            actual = sampler_ops.random_sample(probs, actual_gens, use_fp64_gumbel)
+            actual = sampler_ops.random_sample(probs.clone(), actual_gens, use_fp64_gumbel)
             actual_default = torch.cuda.get_rng_state()
             assert torch.equal(actual, expected)
             assert torch.equal(actual_default, expected_default)

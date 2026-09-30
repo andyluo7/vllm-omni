@@ -49,15 +49,17 @@ def _load_stage_config_helper(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_qwen3_ci_overlay_pins_only_the_talker_sampling_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+    production_path = Path("vllm_omni/deploy/qwen3_omni_moe.yaml")
+    production_before = production_path.read_bytes()
     module = _load_stage_config_helper(monkeypatch)
     generated = Path(module.get_deploy_config_path("ci/qwen3_omni_moe.yaml"))
     overlay = yaml.safe_load(generated.read_text(encoding="utf-8"))
     talker = next(stage for stage in overlay["stages"] if stage["stage_id"] == 1)
 
     assert talker["default_sampling_params"] == {"max_tokens": 1000, "seed": 42}
-    production = yaml.safe_load(Path("vllm_omni/deploy/qwen3_omni_moe.yaml").read_text(encoding="utf-8"))
-    production_talker = next(stage for stage in production["stages"] if stage["stage_id"] == 1)
-    assert "seed" not in production_talker["default_sampling_params"]
+    # Upstream now pins a production seed too. Generating a CI overlay must
+    # preserve the complete production configuration whatever its seed is.
+    assert production_path.read_bytes() == production_before
 
 
 def test_qwen3_ci_overlay_retains_long_output_budget(monkeypatch: pytest.MonkeyPatch) -> None:

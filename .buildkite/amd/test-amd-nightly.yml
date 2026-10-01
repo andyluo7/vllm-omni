@@ -27,6 +27,9 @@ steps:
           - export PYTHONHASHSEED=42
           - export QWEN3_OMNI_FUNCTION_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-qwen3-omni-function"
           - mkdir -p "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/processes-before.txt"
+          - export QWEN3_OMNI_FUNCTION_STARTED_EPOCH=$$(date +%s)
           - >-
             timeout --signal=TERM --kill-after=1m 170m
             pytest -s -v -ra
@@ -36,8 +39,20 @@ steps:
             --durations=0
             --junitxml="$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest.xml"
             2>&1 | tee "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest.log"
+          - echo "runtime_seconds=$$(( $$(date +%s) - QWEN3_OMNI_FUNCTION_STARTED_EPOCH ))" >> "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/environment.txt"
           - tail -n 100 "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest.log" > "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest-summary.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py pytest-result
+            --xml "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest.xml"
+            --log "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest.log"
+            --output "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/pytest-result.txt"
           - printf 'qwen3_omni_sampling_seed=42\npythonhashseed=42\n' > "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/reproducibility.txt"
+
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/processes-before.txt"
+            --after "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/processes-after.txt"
+            --output "$$QWEN3_OMNI_FUNCTION_ARTIFACT_DIR/process-cleanup.txt"
 
       - label: "Qwen3-Omni Accuracy"
         agent_pool: mi300_2
@@ -57,6 +72,9 @@ steps:
           - export PYTHONHASHSEED=42
           - export QWEN3_OMNI_ACCURACY_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-qwen3-omni-accuracy"
           - mkdir -p "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/processes-before.txt"
+          - export QWEN3_OMNI_ACCURACY_STARTED_EPOCH=$$(date +%s)
           - >-
             timeout --signal=TERM --kill-after=1m 170m
             pytest -s -v -ra
@@ -66,7 +84,13 @@ steps:
             --durations=0
             --junitxml="$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest.xml"
             2>&1 | tee "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest.log"
+          - echo "runtime_seconds=$$(( $$(date +%s) - QWEN3_OMNI_ACCURACY_STARTED_EPOCH ))" >> "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/environment.txt"
           - tail -n 100 "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest.log" > "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest-summary.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py pytest-result
+            --xml "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest.xml"
+            --log "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest.log"
+            --output "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/pytest-result.txt"
           - printf 'qwen3_omni_sampling_seed=42\npythonhashseed=42\n' > "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/reproducibility.txt"
           # Native tests run from the image copy under /app/vllm-omni, while
           # Buildkite's artifact hook searches the checkout workspace.
@@ -76,6 +100,12 @@ steps:
               mkdir -p "$$artifact_dir"
               cp -v tests/e2e/accuracy/qwen3_omni/results/qwen_omni_acc/*.json "$$artifact_dir/"
             fi
+
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/processes-before.txt"
+            --after "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/processes-after.txt"
+            --output "$$QWEN3_OMNI_ACCURACY_ARTIFACT_DIR/process-cleanup.txt"
 
       - label: "Qwen3-Omni Documentation Examples"
         agent_pool: mi300_2
@@ -114,8 +144,33 @@ steps:
           automatic:
             - exit_status: 134
               limit: 1
+        artifact_paths:
+          - artifacts/rocm-cosyvoice3-nightly/**/*
         commands:
-          - pytest -s -v tests/e2e/online_serving/test_cosyvoice3_tts_expansion.py -m "slow" --run-level "core_model"
+          - export ROCM_COSYVOICE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-cosyvoice3-nightly"
+          - mkdir -p "$$ROCM_COSYVOICE_ARTIFACT_DIR"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$ROCM_COSYVOICE_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_COSYVOICE_ARTIFACT_DIR/processes-before.txt"
+          - export ROCM_COSYVOICE_STARTED_EPOCH=$$(date +%s)
+          - >-
+            pytest -s -v -ra
+            tests/e2e/online_serving/test_cosyvoice3_tts_expansion.py
+            -m "slow" --run-level "core_model"
+            --durations=0
+            --junitxml="$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest.xml"
+            2>&1 | tee "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest.log"
+          - echo "runtime_seconds=$$(( $$(date +%s) - ROCM_COSYVOICE_STARTED_EPOCH ))" >> "$$ROCM_COSYVOICE_ARTIFACT_DIR/environment.txt"
+          - tail -n 100 "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest.log" > "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest-summary.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py pytest-result
+            --xml "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest.xml"
+            --log "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest.log"
+            --output "$$ROCM_COSYVOICE_ARTIFACT_DIR/pytest-result.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_COSYVOICE_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_COSYVOICE_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_COSYVOICE_ARTIFACT_DIR/process-cleanup.txt"
 
   - group: ":full_moon: ROCm Omni parity expansion"
     steps:

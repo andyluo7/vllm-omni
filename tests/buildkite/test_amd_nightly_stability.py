@@ -141,6 +141,49 @@ def test_function_and_accuracy_selection_are_unchanged() -> None:
     assert accuracy_argv[accuracy_argv.index("-m") + 1] == "full_model and rocm and MI325 and cards_2"
 
 
+@pytest.mark.parametrize(
+    ("label", "artifact_dir"),
+    [
+        ("Qwen3-Omni Function Expansion", "artifacts/rocm-qwen3-omni-function"),
+        ("Qwen3-Omni Accuracy", "artifacts/rocm-qwen3-omni-accuracy"),
+        ("CosyVoice3-TTS E2E Test", "artifacts/rocm-cosyvoice3-nightly"),
+    ],
+)
+def test_nightly_model_jobs_report_runtime_execution_and_cleanup(label: str, artifact_dir: str) -> None:
+    step = _find_step(label)
+    commands = step["commands"]
+    assert f"{artifact_dir}/**/*" in step["artifact_paths"]
+    pytest_index = next(index for index, command in enumerate(commands) if "pytest -s" in command)
+    environment_index = next(
+        index for index, command in enumerate(commands) if "rocm_ci_evidence.py environment" in command
+    )
+    before_index = next(index for index, command in enumerate(commands) if "rocm_ci_evidence.py processes" in command)
+    result_index = next(
+        index for index, command in enumerate(commands) if "rocm_ci_evidence.py pytest-result" in command
+    )
+    cleanup_index = next(index for index, command in enumerate(commands) if "rocm_ci_evidence.py cleanup" in command)
+    assert environment_index < before_index < pytest_index < result_index < cleanup_index
+    assert "--junitxml=" in commands[pytest_index]
+    assert "tee " in commands[pytest_index]
+    assert "runtime_seconds=" in commands[pytest_index + 1]
+    assert "--xml " in commands[result_index] and "--log " in commands[result_index]
+    assert "--before " in commands[cleanup_index] and "--after " in commands[cleanup_index]
+    assert step["grade"] == "NonBlocking"
+
+
+def test_cosyvoice_evidence_preserves_full_scope_and_gpu_hang_retry() -> None:
+    step = _find_step("CosyVoice3-TTS E2E Test")
+    command = next(command for command in step["commands"] if "pytest -s" in command)
+    argv = split(command)
+    assert "tests/e2e/online_serving/test_cosyvoice3_tts_expansion.py" in argv
+    assert argv[argv.index("-m") + 1] == "slow"
+    assert argv[argv.index("--run-level") + 1] == "core_model"
+    assert "--collect-only" not in argv
+    assert step["agent_pool"] == "mi300_1"
+    assert step["timeout_in_minutes"] == 90
+    assert step["retry"] == {"automatic": [{"exit_status": 134, "limit": 1}]}
+
+
 def test_quality_thresholds_are_not_weakened() -> None:
     assertions_source = ASSERTIONS.read_text(encoding="utf-8")
     accuracy_source = ACCURACY_DRIVER.read_text(encoding="utf-8")

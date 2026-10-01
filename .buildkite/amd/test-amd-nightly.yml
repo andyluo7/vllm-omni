@@ -83,6 +83,8 @@ steps:
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 120
+        artifact_paths:
+          - qwen3-omni-doc-artifacts/**/*
         commands:
           - export VLLM_ALLOW_LONG_MAX_MODEL_LEN="1"
           - pytest -s -v tests/examples/online_serving/test_qwen3_omni.py -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
@@ -201,6 +203,7 @@ steps:
         timeout_in_minutes: 100
         artifact_paths:
           - "artifacts/rocm-omni-doc-2gpu/**/*"
+          - "qwen3-omni-doc-artifacts/**/*"
         commands:
           - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-omni-doc-2gpu"
           - export VLLM_ALLOW_LONG_MAX_MODEL_LEN="1"

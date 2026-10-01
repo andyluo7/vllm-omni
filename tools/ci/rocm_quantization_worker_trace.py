@@ -415,7 +415,7 @@ def _install_fp8_scaling_comparison(mode):
     Fp8Config.get_quant_method = route
 
 
-def _install_fp8_block_comparison():
+def _install_fp8_block_comparison(block_size=128):
     import torch
     from vllm import envs
     from vllm.model_executor.layers.quantization.fp8 import Fp8Config
@@ -423,10 +423,12 @@ def _install_fp8_block_comparison():
         Fp8PerBlockOnlineLinearMethod,
         Fp8PerTensorOnlineLinearMethod,
     )
+    from vllm.model_executor.layers.quantization.utils.quant_utils import GroupShape, create_fp8_quant_key
     from vllm.platforms import current_platform
 
     assert current_platform.is_rocm(), "Block comparison requires the original ROCm image"
     assert not envs.VLLM_BATCH_INVARIANT, "Block comparison must retain FP8 activation compute"
+    assert block_size in (32, 64, 128)
     _emit("runtime_sources", sources=[_source_identity(obj) for obj in (Fp8Config, Fp8PerBlockOnlineLinearMethod)])
     original_route = Fp8Config.get_quant_method
     sampled_weights = set()
@@ -450,6 +452,9 @@ def _install_fp8_block_comparison():
         result = original
         if isinstance(original, Fp8PerTensorOnlineLinearMethod):
             result = Fp8PerBlockOnlineLinearMethod()
+            result.weight_block_size = [block_size, block_size]
+            result.activation_quant_key = create_fp8_quant_key(static=False, group_shape=GroupShape(1, block_size))
+            result.weight_quant_key = create_fp8_quant_key(static=True, group_shape=GroupShape(block_size, block_size))
             family = _fp8_component(prefix)
             process_original = result.process_weights_after_loading
             apply_original = result.apply
@@ -466,11 +471,11 @@ def _install_fp8_block_comparison():
                 assert result.fp8_linear.apply_input_quant, "Block kernel must compute FP8 activations"
                 assert current_layer.weight.dtype == current_platform.fp8_dtype()
                 assert type(result.fp8_linear).__name__ == "TritonFp8BlockScaledMMKernel"
-                assert current_layer.weight_block_size == [128, 128]
+                assert current_layer.weight_block_size == [block_size, block_size]
                 if sample:
                     scales = current_layer.weight_scale_inv.float()
-                    row_ids = torch.arange(rows, device=current_layer.weight.device) // 128
-                    col_ids = torch.arange(cols, device=current_layer.weight.device) // 128
+                    row_ids = torch.arange(rows, device=current_layer.weight.device) // block_size
+                    col_ids = torch.arange(cols, device=current_layer.weight.device) // block_size
                     restored = current_layer.weight[:rows, :cols].float() * scales[row_ids[:, None], col_ids[None, :]]
                     _emit(
                         "fp8_block_weight_sample",
@@ -482,6 +487,7 @@ def _install_fp8_block_comparison():
                         activation_quant_key=str(result.activation_quant_key),
                         weight_quant_key=str(result.weight_quant_key),
                         kernel=type(result.fp8_linear).__name__,
+                        block_size=block_size,
                         error=metric(restored, reference),
                     )
                 return value
@@ -493,8 +499,8 @@ def _install_fp8_block_comparison():
                     with torch.no_grad():
                         channels = min(16, current_layer.weight.shape[0])
                         columns = current_layer.weight.shape[1]
-                        row_ids = torch.arange(channels, device=current_layer.weight.device) // 128
-                        col_ids = torch.arange(columns, device=current_layer.weight.device) // 128
+                        row_ids = torch.arange(channels, device=current_layer.weight.device) // block_size
+                        col_ids = torch.arange(columns, device=current_layer.weight.device) // block_size
                         scales = current_layer.weight_scale_inv.float()
                         weights = current_layer.weight[:channels].float() * scales[row_ids[:, None], col_ids[None, :]]
                         reference = x.reshape(-1, columns)[:2].float() @ weights.t()
@@ -507,6 +513,7 @@ def _install_fp8_block_comparison():
                             family=family,
                             input_shape=list(x.shape),
                             kernel=type(result.fp8_linear).__name__,
+                            block_size=block_size,
                             error=metric(actual, reference),
                         )
                 return value
@@ -521,6 +528,7 @@ def _install_fp8_block_comparison():
                 original_method=type(original).__name__,
                 method=type(result).__name__,
                 ignored_layers=config.ignored_layers,
+                block_size=block_size,
             )
         return result
 
@@ -551,8 +559,8 @@ class RocmQuantizationTrace:
                 _install_fp8_trace(bf16_component=component)
             elif mode in ("zimage_per_token", "zimage_ptpc"):
                 _install_fp8_scaling_comparison(mode)
-            elif mode == "zimage_block128":
-                _install_fp8_block_comparison()
+            elif mode in ("zimage_block32", "zimage_block64", "zimage_block128"):
+                _install_fp8_block_comparison(block_size=int(mode.removeprefix("zimage_block")))
             else:
                 raise ValueError(mode)
             _INSTALLED.add(mode)

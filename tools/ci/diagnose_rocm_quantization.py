@@ -165,11 +165,13 @@ def main() -> int:
         )
         if preflight.returncode:
             return preflight.returncode
-    if os.environ["ROCM_QUANT_COMPARISON"] == "zimage_block128":
+    if os.environ["ROCM_QUANT_COMPARISON"] in ("zimage_block32", "zimage_block64", "zimage_block128"):
         preflight = subprocess.run(
             [
                 sys.executable,
                 str(Path(__file__).with_name("verify_rocm_fp8_block.py")),
+                "--block-size",
+                os.environ["ROCM_QUANT_COMPARISON"].removeprefix("zimage_block"),
                 "--output",
                 str(args.output / "fp8-block-preflight.json"),
             ],

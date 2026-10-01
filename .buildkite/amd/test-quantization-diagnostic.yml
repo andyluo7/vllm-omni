@@ -1,21 +1,38 @@
-# Validation draft only. Preserve original pinned/offload behavior and quality gates.
+# Validation draft only. Preserve both FP8 components and original quality gates.
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
-      - label: "Flux2 BF16/FP8 · packed pinned host copies"
+      - label: "Z-Image FP8 quality · 64x64 weight / 1x64 activation blocks"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 100
         artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/flux_packed_host_copy/**/*"
+          - "artifacts/rocm-quant-diagnostic/zimage_block64/**/*"
         commands:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
           - export VLLM_ROCM_USE_SKINNY_GEMM=0
-          - export ROCM_QUANT_COMPARISON=flux_packed_host_copy
+          - export ROCM_QUANT_COMPARISON=zimage_block64
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
-            --case fp8_flux2_dev_text_encoder
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/flux_packed_host_copy"
+            --case fp8_z_image
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_block64"
+      - label: "Z-Image FP8 quality · 32x32 weight / 1x32 activation blocks"
+        agent_pool: mi300_1
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 100
+        artifact_paths:
+          - "artifacts/rocm-quant-diagnostic/zimage_block32/**/*"
+        commands:
+          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
+          - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
+          - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
+          - export VLLM_ROCM_USE_SKINNY_GEMM=0
+          - export ROCM_QUANT_COMPARISON=zimage_block32
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
+            --case fp8_z_image
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_block32"

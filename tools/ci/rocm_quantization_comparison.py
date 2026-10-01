@@ -33,6 +33,8 @@ def pytest_runtest_call(item):
         "zimage_transformer_bf16",
         "zimage_per_token",
         "zimage_ptpc",
+        "zimage_block32",
+        "zimage_block64",
         "zimage_block128",
     ):
         assert item.callspec.params["config"].id == "fp8_z_image"
@@ -57,6 +59,8 @@ def pytest_runtest_call(item):
             "zimage_transformer_bf16",
             "zimage_per_token",
             "zimage_ptpc",
+            "zimage_block32",
+            "zimage_block64",
             "zimage_block128",
         ):
             assert "worker_extension_cls" not in values

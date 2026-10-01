@@ -34,8 +34,10 @@ def _fixture(tmp_path: Path, commands: str, **overrides: str) -> dict[str, str]:
     ps = tmp_path / "bin/ps"
     ps.write_text(
         f"#!{sys.executable}\n"
-        "import os, subprocess, sys\n"
+        "import os, subprocess, sys, time\n"
         "from pathlib import Path\n"
+        "if 'pgid=' in ' '.join(sys.argv[1:]):\n"
+        "    time.sleep(float(os.environ.get('ROCM_CI_CONTRACT_CAPTURE_DELAY', '0')))\n"
         "rows = subprocess.check_output(['/bin/ps', '-eo', 'pid=,ppid=,pgid=,lstart=,stat=,comm='], text=True).splitlines()\n"
         "include_group = 'pgid=' in ' '.join(sys.argv[1:])\n"
         "owned = {int(os.environ['ROCM_CI_CONTRACT_ROOT_PID'])}\n"
@@ -234,6 +236,29 @@ def test_surviving_owned_process_is_terminated_and_fails_job(
     if kill_required:
         deadline = next(action for action in captures if action["trigger"] == "termination_deadline")
         assert any("sleep" in line for line in deadline["processes"])
+
+
+def test_survivor_exiting_during_capture_still_fails_cleanup(tmp_path: Path) -> None:
+    # The runner observes this closed-output group immediately after the shell
+    # exits. Delay only the process census so the group exits before TERM.
+    result, report = _run(
+        tmp_path,
+        "pytest -q test_sample.py::test_ok\nsleep 1 >/dev/null 2>&1 &",
+        ROCM_CI_CONTRACT_CAPTURE_DELAY="1.5",
+    )
+    assert result.returncode == 1, result.stdout
+    assert "test commands left a surviving process group" in report["problems"]
+    command = json.loads((tmp_path / "artifacts/rocm-job/command-result.json").read_text())
+    observed = next(
+        action for action in command["termination_actions"] if action["reason"] == "surviving_process_group"
+    )
+    assert observed["observed_before_capture"]
+    assert observed["signal_delivered"] is False
+    capture = next(
+        action for action in command["termination_actions"] if action["reason"] == "termination_process_evidence"
+    )
+    assert capture["processes"] == []
+    assert (tmp_path / "artifacts/rocm-job" / capture["census_file"]).is_file()
 
 
 def test_runner_sigterm_reaps_owned_test_group_and_retains_partial_report(tmp_path: Path) -> None:

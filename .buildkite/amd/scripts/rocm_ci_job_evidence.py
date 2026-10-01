@@ -61,6 +61,12 @@ def _signal_group(process: subprocess.Popen, signum: int) -> bool:
         return True
     except ProcessLookupError:
         return False
+    except PermissionError as error:
+        # An inaccessible group still exists. Keep it failing cleanup while
+        # retaining the command report if teardown cannot signal it.
+        if signum:
+            print(f"Could not signal owned process group {process.pid} with {signum}: {error}", flush=True)
+        return signum == 0
 
 
 def _retain_termination_processes(directory: Path, process: subprocess.Popen, actions: list[dict], reason: str) -> None:
@@ -95,6 +101,18 @@ def _retain_termination_processes(directory: Path, process: subprocess.Popen, ac
         actions.append({"reason": "termination_process_evidence_unavailable", "trigger": reason, "error": str(error)})
 
 
+def _terminate_surviving_group(directory: Path, process: subprocess.Popen, actions: list[dict]) -> bool:
+    if not _signal_group(process, 0):
+        return False
+    # Evidence collection can outlive a transient process. Retain the observed
+    # cleanup failure even if the group disappears before TERM is delivered.
+    action = {"reason": "surviving_process_group", "signal": int(signal.SIGTERM), "observed_before_capture": True}
+    actions.append(action)
+    _retain_termination_processes(directory, process, actions, "surviving_process_group")
+    action["signal_delivered"] = _signal_group(process, signal.SIGTERM)
+    return True
+
+
 def run(directory: Path, commands: str) -> int:
     received: list[int] = []
     handlers = {}
@@ -126,9 +144,7 @@ def run(directory: Path, commands: str) -> int:
                 if process.poll() is not None and exited_at is None:
                     exited_at = now
                 if exited_at is not None and now - exited_at >= 1 and deadline is None:
-                    _retain_termination_processes(directory, process, actions, "surviving_process_group")
-                    if _signal_group(process, signal.SIGTERM):
-                        actions.append({"reason": "surviving_process_group", "signal": int(signal.SIGTERM)})
+                    _terminate_surviving_group(directory, process, actions)
                     deadline = now + 5
                 if deadline is not None and now >= deadline:
                     _retain_termination_processes(directory, process, actions, "termination_deadline")
@@ -148,10 +164,7 @@ def run(directory: Path, commands: str) -> int:
                     sys.stdout.buffer.flush()
             # A daemon can close its inherited output stream but still retain
             # the process group. Terminate only this job's owned group.
-            if _signal_group(process, 0):
-                _retain_termination_processes(directory, process, actions, "surviving_process_group")
-            if _signal_group(process, signal.SIGTERM):
-                actions.append({"reason": "surviving_process_group", "signal": int(signal.SIGTERM)})
+            if _terminate_surviving_group(directory, process, actions):
                 until = time.monotonic() + 5
                 while time.monotonic() < until:
                     if not _signal_group(process, 0):

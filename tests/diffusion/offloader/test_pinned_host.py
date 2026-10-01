@@ -8,13 +8,14 @@ import pytest
 import torch
 from torch import nn
 
-from tests.helpers.mark import hardware_marks
+from tests.helpers.mark import hardware_test
 from vllm_omni.diffusion.offloader import pinned_host
 from vllm_omni.diffusion.offloader.sequential_backend import SequentialOffloadHook
 
-pytestmark = [pytest.mark.diffusion, pytest.mark.core_model, pytest.mark.cpu]
+pytestmark = [pytest.mark.diffusion, pytest.mark.core_model]
 
 
+@pytest.mark.cpu
 @pytest.mark.parametrize("sizes", [[1, 17, 257], [513, 1025, 2049], [270412], [], [8193, 3, 1025]])
 def test_pinned_plan_never_increases_allocator_backing(sizes):
     allocations, placements = pinned_host.plan_pinned_slabs(sizes, slab_bytes=4096)
@@ -29,6 +30,7 @@ def test_pinned_plan_never_increases_allocator_backing(sizes):
                 assert start + sizes[left] <= other_start or other_start + sizes[right] <= start
 
 
+@pytest.mark.cpu
 @pytest.mark.parametrize("sizes,capacity", [([0], 4096), ([-1], 4096), ([1], 255), ([1], 768)])
 def test_pinned_plan_rejects_invalid_storage(sizes, capacity):
     with pytest.raises(ValueError):
@@ -45,7 +47,7 @@ def _aliased_module() -> nn.Module:
     return module
 
 
-@hardware_marks(res={"cuda": "H100", "rocm": "mi300_1"}, num_cards=1)
+@hardware_test(res={"cuda": ["H100", "B200"], "rocm": "MI325"}, num_cards=1)
 def test_pinned_offload_preserves_data_aliases_and_releases_backing():
     if not torch.version.hip:
         pytest.skip("Requires the ROCm pinned-host allocator")
@@ -90,7 +92,7 @@ def test_pinned_offload_preserves_data_aliases_and_releases_backing():
     assert final["allocations.current"] == initial["allocations.current"]
 
 
-@hardware_marks(res={"cuda": "H100", "rocm": "mi300_1"}, num_cards=1)
+@hardware_test(res={"cuda": ["H100", "B200"], "rocm": "MI325"}, num_cards=1)
 def test_failed_pinned_copy_synchronizes_before_releasing_storage(monkeypatch):
     if not torch.version.hip:
         pytest.skip("Requires ROCm pinned-host transfer")

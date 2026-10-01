@@ -1077,7 +1077,7 @@ class RVQEARTTSModel(nn.Module):
             else:
                 # The inference loader requires this buffer from the checkpoint.
                 # Avoid CPU QR (and its LAPACK dependency) for a value it replaces.
-                W = torch.empty(self.hidden_size, self.hidden_size)
+                W = torch.empty(self.hidden_size, self.hidden_size, dtype=torch.float32)
             self.register_buffer("audio_prompt_projection_W", W)
 
         # Prediction Heads

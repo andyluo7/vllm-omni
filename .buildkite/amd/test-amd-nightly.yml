@@ -203,6 +203,7 @@ steps:
         timeout_in_minutes: 100
         artifact_paths:
           - "artifacts/rocm-omni-doc-2gpu/**/*"
+          - "qwen3-omni-doc-artifacts/**/*"
         commands:
           - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-omni-doc-2gpu"
           - export VLLM_ALLOW_LONG_MAX_MODEL_LEN="1"

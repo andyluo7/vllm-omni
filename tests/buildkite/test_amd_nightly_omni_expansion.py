@@ -60,7 +60,10 @@ def test_jobs_are_nonblocking_and_retain_evidence(label: str, contract: tuple[st
     assert step["agent_pool"] == queue
     assert step["grade"] == "NonBlocking"
     assert step["timeout_in_minutes"] == timeout
-    assert step["artifact_paths"] == [f"{artifact_dir}/**/*"]
+    artifact_paths = [f"{artifact_dir}/**/*"]
+    if label == "ROCm · Omni Documentation · 2-GPU":
+        artifact_paths.append("qwen3-omni-doc-artifacts/**/*")
+    assert step["artifact_paths"] == artifact_paths
     assert len(pytest_commands) == 1
     assert f"--kill-after=1m {pytest_timeout}" in pytest_commands[0]
     assert "--collect-only" not in command_text

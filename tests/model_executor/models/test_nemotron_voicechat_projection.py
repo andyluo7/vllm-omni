@@ -56,14 +56,22 @@ def test_checkpoint_projection_restores_buffer_without_cpu_qr(monkeypatch):
     assert "audio_prompt_projection_W" in dict(model.named_buffers())
     assert "audio_prompt_projection_W" not in dict(model.named_parameters())
 
-    checkpoint = model.state_dict()
-    checkpoint.pop("audio_prompt_projection_W")
+    # Inference loads through DuplexEARTTS, whose parent-module traversal
+    # reports missing child buffers. RVQEARTTSModel.load_state_dict itself
+    # intentionally retries partial training initialization after an error.
+    container = nn.Module()
+    container.add_module("tts_model", model)
+    checkpoint = container.state_dict()
+    checkpoint.pop("tts_model.audio_prompt_projection_W")
+    missing, unexpected = container.load_state_dict(checkpoint, strict=False)
+    assert missing == ["tts_model.audio_prompt_projection_W"]
+    assert unexpected == []
     with pytest.raises(RuntimeError, match="audio_prompt_projection_W"):
-        model.load_state_dict(checkpoint)
+        container.load_state_dict(checkpoint)
 
     projection = torch.arange(16, dtype=torch.float32).reshape(4, 4)
-    checkpoint["audio_prompt_projection_W"] = projection
-    model.load_state_dict(checkpoint)
+    checkpoint["tts_model.audio_prompt_projection_W"] = projection
+    container.load_state_dict(checkpoint)
     torch.testing.assert_close(model.audio_prompt_projection_W, projection, atol=0, rtol=0)
 
 

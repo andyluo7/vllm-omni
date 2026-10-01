@@ -135,7 +135,14 @@ def has_level_marker(contents: str) -> bool:
 
 def has_hardware_marker(contents: str) -> bool:
     """Check if file contents contain a platform marker or hardware helper."""
-    return bool(_platform_re().search(contents) or HELPER_RE.search(contents))
+    if _platform_re().search(contents) or HELPER_RE.search(contents):
+        return True
+    try:
+        tree = ast.parse(contents)
+    except SyntaxError:
+        return False
+    helpers = _hardware_helper_names(tree)
+    return any(isinstance(node, ast.Call) and _name(node.func) in helpers for node in ast.walk(tree))
 
 
 def has_direct_sku_marker(path: str, contents: str) -> bool:
@@ -156,6 +163,16 @@ def _name(node: ast.AST) -> str | None:
 _DYNAMIC = object()
 
 
+def _hardware_helper_names(tree: ast.AST) -> dict[str, str]:
+    helpers = {name: name for name in HARDWARE_HELPERS}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "tests.helpers.mark":
+            for alias in node.names:
+                if alias.name in HARDWARE_HELPERS:
+                    helpers[alias.asname or alias.name] = alias.name
+    return helpers
+
+
 def _literal(node: ast.AST):
     try:
         return ast.literal_eval(node)
@@ -173,12 +190,7 @@ def hardware_contract_errors(contents: str) -> list[str]:
         tree = ast.parse(contents)
     except SyntaxError:
         return []  # Python syntax is checked by a separate hook.
-    helpers = {name: name for name in HARDWARE_HELPERS}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "tests.helpers.mark":
-            for alias in node.names:
-                if alias.name in HARDWARE_HELPERS:
-                    helpers[alias.asname or alias.name] = alias.name
+    helpers = _hardware_helper_names(tree)
     # Validate calls evaluated during collection. Calls in a test body can
     # intentionally exercise invalid arguments under pytest.raises.
     collection_nodes = []

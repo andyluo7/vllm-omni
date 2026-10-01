@@ -36,7 +36,7 @@ def main() -> None:
     pipeline = yaml.safe_load(result.stdout)
     pipeline["steps"] = [group for group in pipeline["steps"] if group["group"] != "AMD Tests"]
     steps = [step for group in pipeline["steps"] for step in group["steps"]]
-    assert len(steps) == 2
+    assert len(steps) == 1
     for step in steps:
         step.pop("depends_on", None)
         pod = step["plugins"][0]["kubernetes"]["podSpecPatch"]
@@ -55,7 +55,7 @@ def main() -> None:
         subprocess.run(["buildkite-agent", "artifact", "upload", str(args.output)], check=True, timeout=60)
         subprocess.run(["buildkite-agent", "pipeline", "upload", str(args.output)], check=True, timeout=60)
     commit = os.environ.get("BUILDKITE_COMMIT", "local")
-    print(f"Rendered two native one-GPU diagnostics using image {SOURCE}; commit={commit}")
+    print(f"Rendered one native one-GPU diagnostic using image {SOURCE}; commit={commit}")
 
 
 if __name__ == "__main__":

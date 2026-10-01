@@ -64,6 +64,12 @@ def _components(pipeline):
     }
 
 
+def _fp8_component(prefix):
+    # Z-Image builds AutoModelForCausalLM for its text encoder. Its lm_head
+    # runs before the diffusion transformer and must not consume that sample.
+    return "encoder" if prefix.startswith("model.") or prefix == "lm_head" else "transformer"
+
+
 def _install_flux_trace():
     from vllm_omni.diffusion.models.flux2.pipeline_flux2 import Flux2Pipeline
     from vllm_omni.diffusion.offloader.sequential_backend import ModelLevelOffloadBackend, SequentialOffloadHook
@@ -172,7 +178,7 @@ def _install_fp8_trace():
     @functools.wraps(original_process)
     def process(method, layer):
         prefix = getattr(method, "_rocm_diagnostic_prefix", "unknown")
-        family = "encoder" if prefix.startswith("model.") else "transformer"
+        family = _fp8_component(prefix)
         sample = family not in sampled_weights and not getattr(
             layer, "_already_called_process_weights_after_loading", False
         )
@@ -207,7 +213,7 @@ def _install_fp8_trace():
     def apply(method, layer, x, bias=None):
         result = original_apply(method, layer, x, bias)
         prefix = getattr(method, "_rocm_diagnostic_prefix", "unknown")
-        family = "encoder" if prefix.startswith("model.") else "transformer"
+        family = _fp8_component(prefix)
         if family not in sampled_activations and x.numel() and layer.weight_scale.numel() == 1:
             sampled_activations.add(family)
             with torch.no_grad():

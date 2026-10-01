@@ -1,4 +1,4 @@
-# Validation draft only. Both jobs use the unmodified d7 quality source/image.
+# Validation draft only. The job uses the unmodified d7 quality source/image.
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
@@ -18,19 +18,3 @@ steps:
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
             --case fp8_z_image
             --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/fp8_z_image"
-      - label: "Flux2 FP8 text encoder · component movement trace"
-        agent_pool: mi300_1
-        mirror_hardwares: [amdproduction]
-        grade: NonBlocking
-        timeout_in_minutes: 100
-        artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/fp8_flux2_dev_text_encoder/**/*"
-        commands:
-          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
-          - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
-          - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=flux_movement_trace
-          - >-
-            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
-            --case fp8_flux2_dev_text_encoder
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/fp8_flux2_dev_text_encoder"

@@ -10,11 +10,11 @@ eager off CUDA) and the tiled decode of long clips.
 
 import pytest
 import torch
+
+from tests.helpers.mark import hardware_test
 from vllm_omni.diffusion.models.auk.auk_vae import AuKVAE, LowPass, SnakeBeta, Upsample
 from vllm_omni.diffusion.models.auk.vae_cudagraph import AuKVAEDecodeGraph, plan_tiles
 from vllm_omni.platforms import current_omni_platform
-
-from tests.helpers.mark import hardware_test
 
 pytestmark = [pytest.mark.core_model]
 

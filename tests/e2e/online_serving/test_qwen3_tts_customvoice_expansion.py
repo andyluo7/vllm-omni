@@ -148,6 +148,9 @@ def test_sample_rate_001(omni_server, online_client) -> None:
         "stream": False,
         "response_format": "wav",
         "sample_rate": 8000,
+        # Whisper-small mishears this 8 kHz clip; confirm content on the same
+        # audio with the stronger decoder before rejecting the response.
+        "transcript_escalation_model": "large-v3",
         "task_type": "CustomVoice",
         "voice": "vivian",
     }

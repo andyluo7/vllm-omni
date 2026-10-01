@@ -25,12 +25,12 @@ steps:
             python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes
             --output "$$ROCM_REPLAY_OUTPUT/processes-before.txt"
           - >-
-            trap 'replay_status=$?; trap - EXIT;
+            trap 'replay_status=$$?; trap - EXIT;
             python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
             --before "$$ROCM_REPLAY_OUTPUT/processes-before.txt"
             --after "$$ROCM_REPLAY_OUTPUT/processes-after.txt"
             --output "$$ROCM_REPLAY_OUTPUT/process-cleanup.txt";
-            cleanup_status=$?; if (( replay_status != 0 )); then exit "$$replay_status";
+            cleanup_status=$$?; if (( replay_status != 0 )); then exit "$$replay_status";
             else exit "$$cleanup_status"; fi' EXIT
           - >-
             timeout 2400 python3

@@ -27,6 +27,7 @@ def pytest_runtest_call(item):
         "zimage_transformer_bf16",
         "zimage_per_token",
         "zimage_ptpc",
+        "zimage_block128",
     ):
         assert item.callspec.params["config"].id == "fp8_z_image"
     else:
@@ -49,6 +50,7 @@ def pytest_runtest_call(item):
             "zimage_transformer_bf16",
             "zimage_per_token",
             "zimage_ptpc",
+            "zimage_block128",
         ):
             assert "worker_extension_cls" not in values
             values["worker_extension_cls"] = "rocm_quantization_worker_trace.RocmQuantizationTrace"

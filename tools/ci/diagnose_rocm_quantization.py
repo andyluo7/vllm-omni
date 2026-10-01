@@ -126,6 +126,7 @@ def main() -> int:
                 "VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT",
                 "VLLM_CI_EXPECTED_GPU_COUNT",
                 "VLLM_ROCM_USE_SKINNY_GEMM",
+                "VLLM_DISABLED_KERNELS",
                 "ROCM_QUANT_COMPARISON",
                 "PYTORCH_ALLOC_CONF",
                 "PYTORCH_CUDA_ALLOC_CONF",
@@ -147,6 +148,19 @@ def main() -> int:
                 str(args.output / "host-cache-preflight.json"),
             ],
             timeout=90,
+            check=False,
+        )
+        if preflight.returncode:
+            return preflight.returncode
+    if os.environ["ROCM_QUANT_COMPARISON"] == "zimage_block128":
+        preflight = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("verify_rocm_fp8_block.py")),
+                "--output",
+                str(args.output / "fp8-block-preflight.json"),
+            ],
+            timeout=300,
             check=False,
         )
         if preflight.returncode:
@@ -201,7 +215,7 @@ def main() -> int:
                 elif terminating_at is not None and now - terminating_at >= 60:
                     stop_group(signal.SIGKILL)
                 for key, _events in selector.select(timeout=1):
-                    chunk = os.read(key.fileobj.fileno(), 65536)
+                    chunk = os.read(key.fd, 65536)
                     if not chunk:
                         selector.unregister(key.fileobj)
                         continue

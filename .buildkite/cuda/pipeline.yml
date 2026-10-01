@@ -1,9 +1,7 @@
-# Hook uploads this entry YAML; upload_pipeline.py --upload reads bootstrap-upload-steps.yml
-# and injects ``if`` by step ``key`` from skip-ci.
+# Diagnostic only; replay uses the original AMD image and fixed retained WAV.
 steps:
-  - label: ":github: Resolve skip-ci & upload pipeline"
-    key: upload-ci-pipeline
+  - label: "ROCm fixed TTS audio replay · AMD pipeline"
     commands:
-      - "python3 .buildkite/common/scripts/upload_pipeline.py --upload .buildkite/cuda/bootstrap-upload-steps.yml"
+      - "echo 'See buildkite/vllm-omni-amd-ci for fixed failing TTS WAV replay.'"
     agents:
-      queue: "cpu_queue_premerge"
+      queue: cpu_queue_premerge

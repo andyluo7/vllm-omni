@@ -1,0 +1,39 @@
+# Diagnostic only: fixed retained WAV, original source/image and quality floor.
+env:
+  VLLM_WORKER_MULTIPROC_METHOD: spawn
+  HF_HUB_DOWNLOAD_TIMEOUT: 300
+  HF_HUB_ETAG_TIMEOUT: 60
+steps:
+  - group: ROCm fixed failing TTS audio replay
+    steps:
+      - label: "Fixed TTS sample-rate WAV · ASR replay"
+        agent_pool: mi300_1
+        mirror_hardwares:
+          - amdproduction
+        grade: NonBlocking
+        timeout_in_minutes: 45
+        artifact_paths:
+          - artifacts/rocm-tts-failed-audio-replay/**/*
+        commands:
+          - export ROCM_REPLAY_OUTPUT="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-tts-failed-audio-replay"
+          - mkdir -p "$$ROCM_REPLAY_OUTPUT"
+          - >-
+            BUILDKITE_COMMIT=ad7c78e1589347c6b0580faf69afd107fdbaf5b1
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment
+            --output "$$ROCM_REPLAY_OUTPUT/environment.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes
+            --output "$$ROCM_REPLAY_OUTPUT/processes-before.txt"
+          - >-
+            trap 'replay_status=$?; trap - EXIT;
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_REPLAY_OUTPUT/processes-before.txt"
+            --after "$$ROCM_REPLAY_OUTPUT/processes-after.txt"
+            --output "$$ROCM_REPLAY_OUTPUT/process-cleanup.txt";
+            cleanup_status=$?; if (( replay_status != 0 )); then exit "$$replay_status";
+            else exit "$$cleanup_status"; fi' EXIT
+          - >-
+            timeout 2400 python3
+            "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/replay_rocm_tts_failed_audio.py"
+            --manifest "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/tts_failed_audio_manifest.json"
+            --output "$$ROCM_REPLAY_OUTPUT"

@@ -1,0 +1,19 @@
+{
+  "build": 13155,
+  "job": "01a0f852-70b8-4411-99d9-5a33cba12044",
+  "image_source": "ad7c78e1589347c6b0580faf69afd107fdbaf5b1",
+  "test": "tests/e2e/online_serving/test_qwen3_tts_customvoice_expansion.py::test_sample_rate_001[async_chunk]",
+  "threshold": 0.9,
+  "inputs": {
+    "response.wav": {
+      "url": "https://buildkite.com/organizations/vllm/pipelines/vllm-omni-amd-ci/builds/13155/jobs/01a0f852-70b8-4411-99d9-5a33cba12044/artifacts/01a0f871-3b0e-4609-965b-555f0a645166",
+      "sha256": "22ca669618e09f6ced538f49640865636dcee3bc3bf09b929dee7a9cd0a49aaf",
+      "bytes": 89644
+    },
+    "transcription.json": {
+      "url": "https://buildkite.com/organizations/vllm/pipelines/vllm-omni-amd-ci/builds/13155/jobs/01a0f852-70b8-4411-99d9-5a33cba12044/artifacts/01a0f871-3b0e-472c-9993-3bb96de978b3",
+      "sha256": "42b068427affa329615207cf6b76e498d4d5f97c3ba28ed5310481cd5e534190",
+      "bytes": 1183
+    }
+  }
+}

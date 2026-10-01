@@ -1,20 +1,52 @@
-# Validation draft only. The job uses the unmodified d7 quality source/image.
+# Validation draft only. Reuse the exact d7 quality source/image and gates.
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
-      - label: "Z-Image FP8 quality · layer routing and numerical trace"
+      - label: "Z-Image FP8 quality · BF16 encoder comparison"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 100
         artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/fp8_z_image/**/*"
+          - "artifacts/rocm-quant-diagnostic/zimage_encoder_bf16/**/*"
         commands:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=fp8_routing_trace
+          - export ROCM_QUANT_COMPARISON=zimage_encoder_bf16
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
             --case fp8_z_image
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/fp8_z_image"
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_encoder_bf16"
+      - label: "Z-Image FP8 quality · BF16 transformer comparison"
+        agent_pool: mi300_1
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 100
+        artifact_paths:
+          - "artifacts/rocm-quant-diagnostic/zimage_transformer_bf16/**/*"
+        commands:
+          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
+          - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
+          - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
+          - export ROCM_QUANT_COMPARISON=zimage_transformer_bf16
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
+            --case fp8_z_image
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_transformer_bf16"
+      - label: "Flux2 quality · blocking CPU-copy movement trace"
+        agent_pool: mi300_1
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 100
+        artifact_paths:
+          - "artifacts/rocm-quant-diagnostic/flux_blocking_cpu_copy/**/*"
+        commands:
+          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
+          - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
+          - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
+          - export ROCM_QUANT_COMPARISON=flux_blocking_cpu_copy
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
+            --case fp8_flux2_dev_text_encoder
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/flux_blocking_cpu_copy"

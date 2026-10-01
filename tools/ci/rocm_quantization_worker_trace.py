@@ -70,7 +70,7 @@ def _fp8_component(prefix):
     return "encoder" if prefix.startswith("model.") or prefix == "lm_head" else "transformer"
 
 
-def _install_flux_trace():
+def _install_flux_trace(*, blocking_cpu_copy=False):
     from vllm_omni.diffusion.models.flux2.pipeline_flux2 import Flux2Pipeline
     from vllm_omni.diffusion.offloader.sequential_backend import ModelLevelOffloadBackend, SequentialOffloadHook
 
@@ -107,12 +107,16 @@ def _install_flux_trace():
     def move(module, target_device, **kwargs):
         nonlocal move_count
         move_count += 1
+        requested_kwargs = dict(kwargs)
+        if blocking_cpu_copy and str(target_device) == "cpu":
+            kwargs = {**kwargs, "non_blocking": False}
         trace = move_count <= 64
         if trace:
             _emit(
                 "move_before",
                 move=move_count,
                 target=str(target_device),
+                requested_kwargs=requested_kwargs,
                 kwargs=kwargs,
                 module=_module_summary(module),
                 memory=_memory(),
@@ -132,7 +136,7 @@ def _install_flux_trace():
     SequentialOffloadHook._move_params = staticmethod(move)
 
 
-def _install_fp8_trace():
+def _install_fp8_trace(*, bf16_component=None):
     import torch
     from vllm.model_executor.layers.quantization.fp8 import Fp8Config
     from vllm.model_executor.layers.quantization.online.fp8 import Fp8PerTensorOnlineLinearMethod
@@ -145,6 +149,11 @@ def _install_fp8_trace():
     def route(config, layer, prefix):
         nonlocal route_count
         result = original_route(config, layer, prefix)
+        original_method = type(result).__name__
+        if isinstance(result, Fp8PerTensorOnlineLinearMethod) and _fp8_component(prefix) == bf16_component:
+            from vllm.model_executor.layers.linear import UnquantizedLinearMethod
+
+            result = UnquantizedLinearMethod()
         route_count += 1
         if route_count <= 1024:
             _emit(
@@ -152,6 +161,8 @@ def _install_fp8_trace():
                 prefix=prefix,
                 layer=type(layer).__name__,
                 method=type(result).__name__,
+                original_method=original_method,
+                bf16_component=bf16_component,
                 ignored_layers=config.ignored_layers,
                 match_mode=str(config.ignored_layers_match_mode),
             )
@@ -246,10 +257,15 @@ class RocmQuantizationTrace:
     def __init__(self, *args, **kwargs):
         mode = os.environ["ROCM_QUANT_COMPARISON"]
         if mode not in _INSTALLED:
-            if mode == "flux_movement_trace":
-                _install_flux_trace()
-            elif mode == "fp8_routing_trace":
-                _install_fp8_trace()
+            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy"):
+                _install_flux_trace(blocking_cpu_copy=mode == "flux_blocking_cpu_copy")
+            elif mode in ("fp8_routing_trace", "zimage_encoder_bf16", "zimage_transformer_bf16"):
+                component = {
+                    "fp8_routing_trace": None,
+                    "zimage_encoder_bf16": "encoder",
+                    "zimage_transformer_bf16": "transformer",
+                }[mode]
+                _install_fp8_trace(bf16_component=component)
             else:
                 raise ValueError(mode)
             _INSTALLED.add(mode)

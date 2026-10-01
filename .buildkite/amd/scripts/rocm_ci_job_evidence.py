@@ -63,6 +63,38 @@ def _signal_group(process: subprocess.Popen, signum: int) -> bool:
         return False
 
 
+def _retain_termination_processes(directory: Path, process: subprocess.Popen, actions: list[dict], reason: str) -> None:
+    """Capture process identities before signalling; keep the existing verdict."""
+    if any(action.get("trigger") == reason for action in actions):
+        return
+    try:
+        result = subprocess.run(
+            ["ps", "-eo", "pid=,ppid=,pgid=,lstart=,stat=,comm="],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=True,
+        )
+        path = directory / f"termination-processes-{len(actions)}.txt"
+        path.write_text(result.stdout, encoding="utf-8")
+        owned = []
+        for line in result.stdout.splitlines():
+            fields = line.split(None, 9)
+            if len(fields) == 10 and int(fields[2]) == process.pid:
+                owned.append(line)
+        actions.append(
+            {
+                "reason": "termination_process_evidence",
+                "trigger": reason,
+                "owned_process_group": process.pid,
+                "processes": owned,
+                "census_file": path.name,
+            }
+        )
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        actions.append({"reason": "termination_process_evidence_unavailable", "trigger": reason, "error": str(error)})
+
+
 def run(directory: Path, commands: str) -> int:
     received: list[int] = []
     handlers = {}
@@ -87,16 +119,19 @@ def run(directory: Path, commands: str) -> int:
             while selector.get_map() or process.poll() is None:
                 now = time.monotonic()
                 if received and deadline is None:
+                    _retain_termination_processes(directory, process, actions, "job_signal")
                     _signal_group(process, received[0])
                     actions.append({"reason": "job_signal", "signal": received[0]})
                     deadline = now + 5
                 if process.poll() is not None and exited_at is None:
                     exited_at = now
                 if exited_at is not None and now - exited_at >= 1 and deadline is None:
+                    _retain_termination_processes(directory, process, actions, "surviving_process_group")
                     if _signal_group(process, signal.SIGTERM):
                         actions.append({"reason": "surviving_process_group", "signal": int(signal.SIGTERM)})
                     deadline = now + 5
                 if deadline is not None and now >= deadline:
+                    _retain_termination_processes(directory, process, actions, "termination_deadline")
                     if _signal_group(process, signal.SIGKILL):
                         actions.append({"reason": "termination_deadline", "signal": int(signal.SIGKILL)})
                     if now >= deadline + 2 and selector.get_map():
@@ -113,6 +148,8 @@ def run(directory: Path, commands: str) -> int:
                     sys.stdout.buffer.flush()
             # A daemon can close its inherited output stream but still retain
             # the process group. Terminate only this job's owned group.
+            if _signal_group(process, 0):
+                _retain_termination_processes(directory, process, actions, "surviving_process_group")
             if _signal_group(process, signal.SIGTERM):
                 actions.append({"reason": "surviving_process_group", "signal": int(signal.SIGTERM)})
                 until = time.monotonic() + 5
@@ -120,6 +157,8 @@ def run(directory: Path, commands: str) -> int:
                     if not _signal_group(process, 0):
                         break
                     time.sleep(0.1)
+                if _signal_group(process, 0):
+                    _retain_termination_processes(directory, process, actions, "termination_deadline")
                 if _signal_group(process, signal.SIGKILL):
                     actions.append({"reason": "termination_deadline", "signal": int(signal.SIGKILL)})
         code = process.wait(timeout=5)
@@ -127,6 +166,7 @@ def run(directory: Path, commands: str) -> int:
         selector.close()
         process.stdout.close()
         if process.poll() is None:
+            _retain_termination_processes(directory, process, actions, "exceptional_teardown")
             _signal_group(process, signal.SIGKILL)
             process.wait(timeout=5)
         for signum, handler in handlers.items():

@@ -34,20 +34,25 @@ def _fixture(tmp_path: Path, commands: str, **overrides: str) -> dict[str, str]:
     ps = tmp_path / "bin/ps"
     ps.write_text(
         f"#!{sys.executable}\n"
-        "import os, subprocess\n"
+        "import os, subprocess, sys\n"
         "from pathlib import Path\n"
-        "rows = subprocess.check_output(['/bin/ps', '-eo', 'pid=,ppid=,lstart=,stat=,comm='], text=True).splitlines()\n"
+        "rows = subprocess.check_output(['/bin/ps', '-eo', 'pid=,ppid=,pgid=,lstart=,stat=,comm='], text=True).splitlines()\n"
+        "include_group = 'pgid=' in ' '.join(sys.argv[1:])\n"
         "owned = {int(os.environ['ROCM_CI_CONTRACT_ROOT_PID'])}\n"
         "detached = Path('detached.pid')\n"
         "if detached.exists(): owned.add(int(detached.read_text()))\n"
+        "group = Path('owned-group.pid')\n"
+        "if group.exists():\n"
+        "    group_id = int(group.read_text())\n"
+        "    owned.update(int(row.split()[0]) for row in rows if int(row.split()[2]) == group_id)\n"
         "while True:\n"
         "    extra = {int(row.split()[0]) for row in rows if int(row.split()[1]) in owned}\n"
         "    if extra <= owned: break\n"
         "    owned.update(extra)\n"
         "for row in rows:\n"
-        "    fields = row.split(None, 8)\n"
-        "    if int(fields[0]) in owned and int(fields[0]) != os.getpid() and fields[8] not in ('/bin/ps', 'ps'):\n"
-        "        print(row)\n"
+        "    fields = row.split(None, 9)\n"
+        "    if int(fields[0]) in owned and int(fields[0]) != os.getpid() and fields[9] not in ('/bin/ps', 'ps'):\n"
+        "        print(row if include_group else ' '.join(fields[:2] + fields[3:]))\n"
     )
     ps.chmod(0o755)
     (tmp_path / "torch.py").write_text(
@@ -90,7 +95,9 @@ def _fixture(tmp_path: Path, commands: str, **overrides: str) -> dict[str, str]:
         "BUILDKITE_JOB_ID": f"contract-{tmp_path.name}",
         "ROCM_CI_CONTRACT_ROOT_PID": str(os.getpid()),
         "HF_HOME": str(tmp_path / "hf"),
-        "TEST_COMMANDS": commands,
+        # Keep the owned group in the local census after its shell exits and
+        # surviving children are reparented to launchd.
+        "TEST_COMMANDS": "printf '%s\\n' \"$$\" > owned-group.pid\n" + commands,
     }
     environment.pop("ROCM_CI_PYTEST_OWNER_PID", None)
     environment.update(overrides)
@@ -201,10 +208,32 @@ def test_detached_process_cannot_pass_cleanup(tmp_path: Path) -> None:
             os.kill(int(pid_file.read_text()), signal.SIGTERM)
 
 
-def test_surviving_owned_process_is_terminated_and_fails_job(tmp_path: Path) -> None:
-    result, report = _run(tmp_path, "pytest -q test_sample.py::test_ok\nsleep 60 &")
+@pytest.mark.parametrize(
+    ("background", "kill_required"),
+    [
+        ("sleep 60 &", False),
+        ("sleep 60 >/dev/null 2>&1 &", False),
+        ("(trap '' TERM; exec sleep 60) >/dev/null 2>&1 &", True),
+    ],
+)
+def test_surviving_owned_process_is_terminated_and_fails_job(
+    tmp_path: Path, background: str, kill_required: bool
+) -> None:
+    result, report = _run(tmp_path, f"pytest -q test_sample.py::test_ok\n{background}")
     assert result.returncode == 1, result.stdout
     assert "test commands left a surviving process group" in report["problems"]
+    command = json.loads((tmp_path / "artifacts/rocm-job/command-result.json").read_text())
+    capture = next(
+        action for action in command["termination_actions"] if action["reason"] == "termination_process_evidence"
+    )
+    assert capture["trigger"] == "surviving_process_group"
+    assert any("sleep" in line for line in capture["processes"])
+    assert (tmp_path / "artifacts/rocm-job" / capture["census_file"]).is_file()
+    captures = [action for action in command["termination_actions"] if "trigger" in action]
+    assert len(captures) == len({action["trigger"] for action in captures})
+    if kill_required:
+        deadline = next(action for action in captures if action["trigger"] == "termination_deadline")
+        assert any("sleep" in line for line in deadline["processes"])
 
 
 def test_runner_sigterm_reaps_owned_test_group_and_retains_partial_report(tmp_path: Path) -> None:

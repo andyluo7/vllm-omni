@@ -22,6 +22,7 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 if [[ "${VLLM_CI_JOB_EVIDENCE:-0}" == "1" ]]; then
     ROCM_CI_JOB_EVIDENCE_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH:-${PWD}}/artifacts/rocm-job"
     export ROCM_CI_JOB_EVIDENCE_DIR
+    export VLLM_CI_SPEECH_EVIDENCE_DIR="${ROCM_CI_JOB_EVIDENCE_DIR}/speech"
     export PYTHONPATH="${script_dir}:${PYTHONPATH}"
     export PYTEST_PLUGINS="rocm_ci_pytest_evidence${PYTEST_PLUGINS:+,${PYTEST_PLUGINS}}"
     mkdir -p "${ROCM_CI_JOB_EVIDENCE_DIR}"

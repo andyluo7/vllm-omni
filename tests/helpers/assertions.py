@@ -25,6 +25,7 @@ import numpy as np
 import soundfile as sf
 from PIL import Image
 
+from tests.helpers.audio_evidence import retain_speech_response, update_speech_evidence
 from tests.helpers.media import (
     convert_audio_bytes_to_text,
     cosine_similarity_text,
@@ -734,6 +735,7 @@ def _assert_pcm_int16_speech_hnr(
     assert len(audio_bytes) % 2 == 0, "PCM byte length must be aligned to int16"
     pcm_samples = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
     hnr = _compute_pcm_hnr_db(pcm_samples, sr=sr)
+    update_speech_evidence(hnr_db=hnr, hnr_floor_db=min_hnr_db, pcm_sample_rate=sr)
     print(f"PCM speech HNR: {hnr:.2f} dB (threshold: {min_hnr_db} dB, sr={sr})")
     assert hnr >= min_hnr_db, f"PCM speech HNR={hnr:.2f} dB is below the configured floor of {min_hnr_db} dB."
 
@@ -968,6 +970,7 @@ def _assert_transcript_matches(
     """
     expected = str(expected_text).strip().lower()
     similarity = cosine_similarity_text(transcript.strip().lower(), expected)
+    update_speech_evidence(transcript=transcript, expected_text=expected_text, similarity=similarity)
     print(f"Cosine similarity: {similarity:.3f}")
     if similarity > threshold:
         return
@@ -983,6 +986,7 @@ def _assert_transcript_matches(
         )
         strong_transcript = convert_audio_bytes_to_text(audio_bytes, model_size=escalation_model, language=language)
         strong_similarity = cosine_similarity_text(strong_transcript.strip().lower(), expected)
+        update_speech_evidence(escalated_transcript=strong_transcript, escalated_similarity=strong_similarity)
         print(
             f"audio content (whisper-{escalation_model}): {strong_transcript}\n"
             f"Cosine similarity (whisper-{escalation_model}): {strong_similarity:.3f}"
@@ -999,6 +1003,7 @@ def _assert_transcript_matches(
     )
 
 
+@retain_speech_response
 def assert_audio_speech_response(response: Any, request_config: dict[str, Any], run_level: str | None = None) -> None:
     """Validate speech API results from :class:`~tests.helpers.client.OmniResponse`.
 

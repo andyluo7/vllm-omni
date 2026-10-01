@@ -661,6 +661,9 @@ steps:
       artifact_paths:
         - "artifacts/rocm-verl-omni-e2e/**/*"
       commands:
+        # Exercise the Ray/server contract without a cold AITER attention build
+        # consuming the test's existing 600-second inference deadline.
+        - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
         - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-verl-omni-e2e"
         - mkdir -p "$$ROCM_CI_ARTIFACT_DIR"
         # Ray appends a session/socket suffix; the native TMPDIR prefix is

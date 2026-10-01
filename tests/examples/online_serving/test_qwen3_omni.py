@@ -25,14 +25,29 @@ from tests.examples.helpers import (
 from tests.helpers.mark import hardware_test
 from tests.helpers.media import cosine_similarity_text
 from tests.helpers.runtime import OmniServerParams
-from tests.helpers.stage_config import get_deploy_config_path
+from tests.helpers.stage_config import get_deploy_config_path, modify_stage_config
 
 pytestmark = [pytest.mark.full_model, pytest.mark.example, pytest.mark.omni]
 
 models = ["Qwen/Qwen3-Omni-30B-A3B-Instruct"]
 
 
-stage_configs = [get_deploy_config_path("ci/qwen3_omni_moe.yaml")]
+# The documentation client asks for a complete image description. With a
+# expanded 512-token thinker response, the shared CI talker's 1000-token cap
+# can cut speech off mid-sentence (CUDA #16473 retained a 79.8275-second prefix).
+# Match the existing long-form function test's audio budgets in this fixture;
+# keep the prompt, thinker budget, sampling seed and similarity gate intact.
+stage_configs = [
+    modify_stage_config(
+        get_deploy_config_path("ci/qwen3_omni_moe.yaml"),
+        updates={
+            "stages": {
+                1: {"default_sampling_params.max_tokens": 3072},
+                2: {"default_sampling_params.max_tokens": 6144},
+            },
+        },
+    )
+]
 
 
 example_dir = str(Path(__file__).parent.parent.parent.parent / "examples" / "online_serving")

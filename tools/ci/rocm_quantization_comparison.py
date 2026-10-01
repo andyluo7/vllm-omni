@@ -21,7 +21,13 @@ def pytest_runtest_call(item):
         assert os.environ["VLLM_ROCM_USE_SKINNY_GEMM"] == "0"
     elif mode in ("unpinned_offload", "flux_movement_trace", "flux_blocking_cpu_copy"):
         assert item.callspec.params["config"].id == "fp8_flux2_dev_text_encoder"
-    elif mode in ("fp8_routing_trace", "zimage_encoder_bf16", "zimage_transformer_bf16"):
+    elif mode in (
+        "fp8_routing_trace",
+        "zimage_encoder_bf16",
+        "zimage_transformer_bf16",
+        "zimage_per_token",
+        "zimage_ptpc",
+    ):
         assert item.callspec.params["config"].id == "fp8_z_image"
     else:
         raise ValueError(f"Unknown diagnostic comparison: {mode}")
@@ -40,6 +46,8 @@ def pytest_runtest_call(item):
             "fp8_routing_trace",
             "zimage_encoder_bf16",
             "zimage_transformer_bf16",
+            "zimage_per_token",
+            "zimage_ptpc",
         ):
             assert "worker_extension_cls" not in values
             values["worker_extension_cls"] = "rocm_quantization_worker_trace.RocmQuantizationTrace"

@@ -253,6 +253,128 @@ def _install_fp8_trace(*, bf16_component=None):
     Fp8PerTensorOnlineLinearMethod.apply = apply
 
 
+def _install_fp8_scaling_comparison(mode):
+    import torch
+    from vllm import envs
+    from vllm.model_executor.layers.quantization.fp8 import Fp8Config
+    from vllm.model_executor.layers.quantization.online.fp8 import (
+        Fp8PerTensorOnlineLinearMethod,
+        Fp8PtpcOnlineLinearMethod,
+    )
+    from vllm.model_executor.layers.quantization.utils.quant_utils import kFp8DynamicTokenSym, kFp8StaticChannelSym
+    from vllm.platforms import current_platform
+
+    assert current_platform.is_rocm(), "Scaling comparisons require the original ROCm runtime"
+    assert not envs.VLLM_BATCH_INVARIANT, "Scaling comparisons must retain FP8 activation compute"
+    assert mode in ("zimage_per_token", "zimage_ptpc")
+    runtime_objects = (Fp8Config, Fp8PerTensorOnlineLinearMethod, Fp8PtpcOnlineLinearMethod)
+    _emit("runtime_sources", sources=[_source_identity(obj) for obj in runtime_objects])
+    original_route = Fp8Config.get_quant_method
+    route_count = 0
+    sampled_weights = set()
+    sampled_activations = set()
+
+    def metric(actual, reference):
+        delta = actual.float() - reference.float()
+        return {
+            "max_abs_error": delta.abs().max().item(),
+            "relative_l2": (
+                torch.linalg.vector_norm(delta) / torch.linalg.vector_norm(reference.float()).clamp_min(1e-12)
+            ).item(),
+            "finite": bool(torch.isfinite(actual).all().item()),
+        }
+
+    @functools.wraps(original_route)
+    def route(config, layer, prefix):
+        nonlocal route_count
+        result = original_route(config, layer, prefix)
+        original_method = type(result).__name__
+        if isinstance(result, Fp8PerTensorOnlineLinearMethod):
+            if mode == "zimage_ptpc":
+                result = Fp8PtpcOnlineLinearMethod()
+            else:
+                result.activation_quant_key = kFp8DynamicTokenSym
+            family = _fp8_component(prefix)
+            original_process = result.process_weights_after_loading
+            original_apply = result.apply
+
+            def process(current_layer):
+                sample = family not in sampled_weights and not getattr(
+                    current_layer, "_already_called_process_weights_after_loading", False
+                )
+                if sample:
+                    sampled_weights.add(family)
+                    shape = current_layer.weight.shape
+                    rows, cols = min(16, shape[0]), min(256, shape[1])
+                    reference = current_layer.weight[:rows, :cols].float()
+                value = original_process(current_layer)
+                assert result.activation_quant_key == kFp8DynamicTokenSym
+                assert result.fp8_linear.config.activation_quant_key == kFp8DynamicTokenSym
+                assert current_layer.weight.dtype == current_platform.fp8_dtype()
+                if mode == "zimage_ptpc":
+                    assert result.weight_quant_key == kFp8StaticChannelSym
+                if sample:
+                    scale = current_layer.weight_scale.float()
+                    sample_scale = scale if scale.numel() == 1 else scale[:rows].reshape(-1, 1)
+                    restored = current_layer.weight[:cols, :rows].float().t() * sample_scale
+                    _emit(
+                        "fp8_scaling_weight_sample",
+                        mode=mode,
+                        prefix=prefix,
+                        family=family,
+                        weight_shape=list(current_layer.weight.shape),
+                        weight_scale_shape=list(scale.shape),
+                        quantized_dtype=str(current_layer.weight.dtype),
+                        activation_quant_key=str(result.activation_quant_key),
+                        weight_quant_key=str(result.weight_quant_key),
+                        kernel=type(result.fp8_linear).__name__,
+                        samples=reference.numel(),
+                        error=metric(restored, reference),
+                    )
+                return value
+
+            def apply(current_layer, x, bias=None):
+                value = original_apply(current_layer, x, bias)
+                if family not in sampled_activations and x.numel():
+                    sampled_activations.add(family)
+                    with torch.no_grad():
+                        channels = min(16, current_layer.weight.shape[1])
+                        inputs = x.reshape(-1, x.shape[-1])[:2].float()
+                        scale = current_layer.weight_scale.float()
+                        sample_scale = scale if scale.numel() == 1 else scale[:channels].reshape(1, -1)
+                        weights = current_layer.weight[:, :channels].float() * sample_scale
+                        reference = inputs @ weights
+                        if bias is not None:
+                            reference += bias[:channels].float()
+                        actual = value.reshape(-1, value.shape[-1])[:2, :channels]
+                        _emit(
+                            "fp8_scaling_activation_gemm_sample",
+                            mode=mode,
+                            prefix=prefix,
+                            family=family,
+                            input_shape=list(x.shape),
+                            kernel=type(result.fp8_linear).__name__,
+                            error=metric(actual, reference),
+                        )
+                return value
+
+            result.process_weights_after_loading = process
+            result.apply = apply
+        route_count += 1
+        if route_count <= 1024:
+            _emit(
+                "fp8_scaling_route",
+                mode=mode,
+                prefix=prefix,
+                original_method=original_method,
+                method=type(result).__name__,
+                ignored_layers=config.ignored_layers,
+            )
+        return result
+
+    Fp8Config.get_quant_method = route
+
+
 class RocmQuantizationTrace:
     def __init__(self, *args, **kwargs):
         mode = os.environ["ROCM_QUANT_COMPARISON"]
@@ -266,6 +388,8 @@ class RocmQuantizationTrace:
                     "zimage_transformer_bf16": "transformer",
                 }[mode]
                 _install_fp8_trace(bf16_component=component)
+            elif mode in ("zimage_per_token", "zimage_ptpc"):
+                _install_fp8_scaling_comparison(mode)
             else:
                 raise ValueError(mode)
             _INSTALLED.add(mode)

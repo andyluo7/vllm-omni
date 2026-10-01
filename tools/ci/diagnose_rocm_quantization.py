@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
-"""Run one unchanged quality case with bounded, live container telemetry."""
+"""Run a controlled quantization comparison with original quality gates."""
 
 from __future__ import annotations
 
@@ -97,6 +97,8 @@ def main() -> int:
         "-ra",
         "-x",
         "--tb=short",
+        "-p",
+        "rocm_quantization_comparison",
         f"{TEST}::test_quantization_quality[{args.case}]",
         "-m",
         "full_model and cuda and H100 and B200 and cards_1",
@@ -106,8 +108,11 @@ def main() -> int:
         f"--junitxml={args.output / 'pytest.xml'}",
     ]
     os.environ["VLLM_OMNI_QUALITY_OUTPUT_DIR"] = str(args.output / "outputs")
+    plugin_path = str(Path(__file__).resolve().parent)
+    os.environ["PYTHONPATH"] = plugin_path + os.pathsep + os.environ.get("PYTHONPATH", "")
     identity = {
         "case": args.case,
+        "comparison": os.environ["ROCM_QUANT_COMPARISON"],
         "test_sha256": digest,
         "command": command,
         "image_source": "d7f463a646641c022dd929e5b3286f15f51d9f01",
@@ -118,6 +123,8 @@ def main() -> int:
                 "VLLM_OMNI_TEST_INIT_TIMEOUT",
                 "VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT",
                 "VLLM_CI_EXPECTED_GPU_COUNT",
+                "VLLM_ROCM_USE_SKINNY_GEMM",
+                "ROCM_QUANT_COMPARISON",
                 "BUILDKITE_COMMIT",
                 "BUILDKITE_JOB_ID",
             )

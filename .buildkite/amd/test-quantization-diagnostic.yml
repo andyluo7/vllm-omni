@@ -2,19 +2,19 @@
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
-      - label: "Flux2 quality · bounded pinned-host allocator cache"
+      - label: "Flux2 quality · release inactive pinned-host cache"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 100
         artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/flux_pinned_cache_cap/**/*"
+          - "artifacts/rocm-quant-diagnostic/flux_host_cache_release/**/*"
         commands:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=flux_pinned_cache_cap
+          - export ROCM_QUANT_COMPARISON=flux_host_cache_release
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
             --case fp8_flux2_dev_text_encoder
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/flux_pinned_cache_cap"
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/flux_host_cache_release"

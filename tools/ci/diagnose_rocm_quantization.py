@@ -86,13 +86,6 @@ def main() -> int:
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     inherited_allocator_config = os.environ.get("PYTORCH_ALLOC_CONF", os.environ.get("PYTORCH_CUDA_ALLOC_CONF", ""))
-    if os.environ["ROCM_QUANT_COMPARISON"] == "flux_pinned_cache_cap":
-        options = [value for value in inherited_allocator_config.split(",") if value]
-        if any(value.split(":", 1)[0] == "pinned_max_cached_size_mb" for value in options):
-            raise RuntimeError("Inherited pinned cache limit would confound the comparison")
-        # Preserve inherited device-allocator options. Torch reads this in the
-        # fresh pytest child before any model allocation occurs.
-        os.environ["PYTORCH_ALLOC_CONF"] = ",".join([*options, "pinned_max_cached_size_mb:1024"])
     digest = hashlib.sha256(TEST.read_bytes()).hexdigest()
     if digest != TEST_SHA256:
         raise RuntimeError(f"Quality source changed: {digest}")
@@ -143,6 +136,21 @@ def main() -> int:
     }
     (args.output / "identity.json").write_text(json.dumps(identity, indent=2))
     print(json.dumps(identity), flush=True)
+    if os.environ["ROCM_QUANT_COMPARISON"] == "flux_host_cache_release":
+        # Check the exact image before allocating any model. No allocator
+        # environment setting changes; unsupported capability stops this run.
+        preflight = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("verify_rocm_host_cache_release.py")),
+                "--output",
+                str(args.output / "host-cache-preflight.json"),
+            ],
+            timeout=90,
+            check=False,
+        )
+        if preflight.returncode:
+            return preflight.returncode
     stopped = threading.Event()
     output_lock = threading.Lock()
 

@@ -84,7 +84,16 @@ def _fp8_component(prefix):
     return "encoder" if prefix.startswith("model.") or prefix == "lm_head" else "transformer"
 
 
-def _install_flux_trace(*, blocking_cpu_copy=False):
+def _resolve_host_cache_release():
+    import torch
+
+    release = getattr(torch._C, "_host_emptyCache", None)
+    if not callable(release):
+        raise RuntimeError(f"Torch {torch.__version__} has no pinned-host cache release operation")
+    return release
+
+
+def _install_flux_trace(*, blocking_cpu_copy=False, release_host_cache=False):
     from vllm_omni.diffusion.models.flux2.pipeline_flux2 import Flux2Pipeline
     from vllm_omni.diffusion.offloader.sequential_backend import ModelLevelOffloadBackend, SequentialOffloadHook
 
@@ -116,6 +125,15 @@ def _install_flux_trace(*, blocking_cpu_copy=False):
     ModelLevelOffloadBackend.enable = enable
     original_move = SequentialOffloadHook._move_params
     move_count = 0
+    release = _resolve_host_cache_release() if release_host_cache else None
+
+    def release_cache(phase, move):
+        if release is None:
+            return
+        before = _memory()
+        release()
+        if move <= 64:
+            _emit("host_cache_release", phase=phase, move=move, before=before, after=_memory())
 
     @functools.wraps(original_move)
     def move(module, target_device, **kwargs):
@@ -135,7 +153,9 @@ def _install_flux_trace(*, blocking_cpu_copy=False):
                 module=_module_summary(module),
                 memory=_memory(),
             )
+        release_cache("before_move", move_count)
         result = original_move(module, target_device, **kwargs)
+        release_cache("after_move", move_count)
         if trace:
             _emit(
                 "move_after",
@@ -393,11 +413,11 @@ class RocmQuantizationTrace:
     def __init__(self, *args, **kwargs):
         mode = os.environ["ROCM_QUANT_COMPARISON"]
         if mode not in _INSTALLED:
-            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy", "flux_pinned_cache_cap"):
-                if mode == "flux_pinned_cache_cap":
-                    assert "pinned_max_cached_size_mb:1024" in os.environ["PYTORCH_ALLOC_CONF"].split(",")
-                    _emit("pinned_allocator_config", value=os.environ["PYTORCH_ALLOC_CONF"])
-                _install_flux_trace(blocking_cpu_copy=mode == "flux_blocking_cpu_copy")
+            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy", "flux_host_cache_release"):
+                _install_flux_trace(
+                    blocking_cpu_copy=mode == "flux_blocking_cpu_copy",
+                    release_host_cache=mode == "flux_host_cache_release",
+                )
             elif mode in ("fp8_routing_trace", "zimage_encoder_bf16", "zimage_transformer_bf16"):
                 component = {
                     "fp8_routing_trace": None,

@@ -54,6 +54,16 @@ def test_hardware_contract_checks_import_aliases():
     assert check_test_marks.hardware_contract_errors(source) == ["Invalid hardware helper"]
 
 
+def test_valid_helper_alias_satisfies_marker_presence_check(monkeypatch):
+    source = (
+        "from tests.helpers.mark import hardware_test as hw\n"
+        '@pytest.mark.core_model\n@hw(res={"rocm": "MI325"})\ndef test_x(): pass'
+    )
+    path = "tests/test_alias.py"
+    monkeypatch.setattr(check_test_marks, "read_test_file", lambda filename: source)
+    assert check_test_marks.get_files_missing_markers([path]) == {}
+
+
 @pytest.mark.parametrize(
     "source",
     [

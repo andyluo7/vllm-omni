@@ -41,6 +41,7 @@ def test_verl_job_matches_ready_contract() -> None:
     assert "--collect-only" not in command_text
     assert "VLLM_CI_ALLOW_NO_TESTS" not in command_text
     assert 'python3 -m pip install --no-deps "ray==2.56.1" "omegaconf==2.3.0"' in commands
+    assert "export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in commands
     for evidence in (
         "dependencies.txt",
         "environment.txt",

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM-Omni project
 
 # Run vLLM-Omni ROCm tests directly in the MI300 Kubernetes pod. The pod's
 # container image is selected by test-template-amd-omni.j2; MI300 has no DinD.
@@ -15,6 +17,45 @@ export PYTHONFAULTHANDLER HF_HOME HF_HUB_DOWNLOAD_TIMEOUT HF_HUB_ETAG_TIMEOUT
 export MIOPEN_DEBUG_CONV_DIRECT MIOPEN_DEBUG_CONV_GEMM VLLM_ROCM_USE_AITER
 export PYTORCH_ROCM_ARCH=""
 export PYTHONPATH="${PYTHONPATH:-..}"
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [[ "${VLLM_CI_JOB_EVIDENCE:-0}" == "1" ]]; then
+    ROCM_CI_JOB_EVIDENCE_DIR="${BUILDKITE_BUILD_CHECKOUT_PATH:-${PWD}}/artifacts/rocm-job"
+    export ROCM_CI_JOB_EVIDENCE_DIR
+    export PYTHONPATH="${script_dir}:${PYTHONPATH}"
+    export PYTEST_PLUGINS="rocm_ci_pytest_evidence${PYTEST_PLUGINS:+,${PYTEST_PLUGINS}}"
+    mkdir -p "${ROCM_CI_JOB_EVIDENCE_DIR}"
+    supervisor_pid=""
+    # shellcheck disable=SC2329 # Invoked by the EXIT trap.
+    finalize_job_evidence() {
+        local original_status=$1
+        trap - EXIT TERM INT HUP
+        set +e
+        python3 "${script_dir}/rocm_ci_job_evidence.py" finish \
+            --directory "${ROCM_CI_JOB_EVIDENCE_DIR}" --exit-code "${original_status}"
+        local evidence_status=$?
+        if (( original_status != 0 )); then
+            exit "${original_status}"
+        fi
+        exit "${evidence_status}"
+    }
+    # shellcheck disable=SC2329 # Invoked by signal traps.
+    forward_job_signal() {
+        local signal_name=$1
+        local signal_status=$2
+        trap - TERM INT HUP
+        if [[ -n "${supervisor_pid}" ]]; then
+            kill -"${signal_name}" "${supervisor_pid}" 2>/dev/null || true
+            wait "${supervisor_pid}" || true
+        fi
+        exit "${signal_status}"
+    }
+    trap 'finalize_job_evidence "$?"' EXIT
+    trap 'forward_job_signal TERM 143' TERM
+    trap 'forward_job_signal INT 130' INT
+    trap 'forward_job_signal HUP 129' HUP
+    python3 "${script_dir}/rocm_ci_job_evidence.py" begin --directory "${ROCM_CI_JOB_EVIDENCE_DIR}"
+fi
 
 if [[ "${VLLM_CI_DOCKER_DISABLED:-0}" != "1" ]]; then
     echo "Error: MI300 CI must run natively with Docker disabled." >&2
@@ -62,7 +103,6 @@ fi
 
 rocminfo
 
-expected_gpus="${VLLM_CI_EXPECTED_GPU_COUNT:-1}"
 python3 - <<'PY'
 import os
 
@@ -75,8 +115,23 @@ actual = torch.cuda.device_count()
 assert actual == expected, f"Expected {expected} ROCm GPU(s), found {actual}"
 PY
 
+if [[ "${VLLM_CI_JOB_EVIDENCE:-0}" == "1" ]]; then
+    python3 "${script_dir}/rocm_ci_evidence.py" environment \
+        --output "${ROCM_CI_JOB_EVIDENCE_DIR}/environment.txt"
+fi
+
 echo "Commands:${commands}"
-if /bin/bash -o pipefail -c '
+if [[ "${VLLM_CI_JOB_EVIDENCE:-0}" == "1" ]]; then
+    python3 "${script_dir}/rocm_ci_job_evidence.py" run \
+        --directory "${ROCM_CI_JOB_EVIDENCE_DIR}" --commands "${commands}" &
+    supervisor_pid=$!
+    if wait "${supervisor_pid}"; then
+        exit_code=0
+    else
+        exit_code=$?
+    fi
+    supervisor_pid=""
+elif /bin/bash -o pipefail -c '
 set -E
 test_status=0
 trap '\''

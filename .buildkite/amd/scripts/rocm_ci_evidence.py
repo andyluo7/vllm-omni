@@ -143,9 +143,15 @@ def _junit_counts(paths: list[Path]) -> dict[str, int]:
 
 def summarize_pytest(xml_paths: list[Path], log: Path, output: Path) -> None:
     totals = _junit_counts(xml_paths)
-    log_text = log.read_text(encoding="utf-8", errors="replace")
-    deselected_matches = [int(value) for value in re.findall(r"(\d+) deselected", log_text)]
-    deselected = max(deselected_matches, default=0)
+    deselected = 0
+    # Verbose GPU logs can be large. Retain the existing maximum-per-log
+    # semantics while reading bounded chunks, including split matches.
+    with log.open("r", encoding="utf-8", errors="replace") as source:
+        overlap = ""
+        while chunk := source.read(65536):
+            text = overlap + chunk
+            deselected = max([deselected, *(int(value) for value in re.findall(r"(\d+) deselected", text))])
+            overlap = text[-64:]
     collected = totals["selected"] + deselected
     executed = totals["passed"] + totals["failed"]
     result = (

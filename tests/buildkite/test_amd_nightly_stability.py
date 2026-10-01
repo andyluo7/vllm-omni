@@ -147,6 +147,8 @@ def test_function_and_accuracy_selection_are_unchanged() -> None:
         ("Qwen3-Omni Function Expansion", "artifacts/rocm-qwen3-omni-function"),
         ("Qwen3-Omni Accuracy", "artifacts/rocm-qwen3-omni-accuracy"),
         ("CosyVoice3-TTS E2E Test", "artifacts/rocm-cosyvoice3-nightly"),
+        ("Qwen3-Omni Documentation Examples", "artifacts/rocm-qwen3-omni-documentation"),
+        ("Qwen3-Omni AITER-on Smoke", "artifacts/rocm-qwen3-omni-aiter-smoke"),
     ],
 )
 def test_nightly_model_jobs_report_runtime_execution_and_cleanup(label: str, artifact_dir: str) -> None:
@@ -182,6 +184,35 @@ def test_cosyvoice_evidence_preserves_full_scope_and_gpu_hang_retry() -> None:
     assert step["agent_pool"] == "mi300_1"
     assert step["timeout_in_minutes"] == 90
     assert step["retry"] == {"automatic": [{"exit_status": 134, "limit": 1}]}
+
+
+@pytest.mark.parametrize(
+    ("label", "node", "budget"),
+    [
+        ("Qwen3-Omni Documentation Examples", "tests/examples/online_serving/test_qwen3_omni.py", 120),
+        (
+            "Qwen3-Omni AITER-on Smoke",
+            "tests/e2e/online_serving/test_qwen3_omni_expansion.py::test_text_to_text_audio_001",
+            90,
+        ),
+    ],
+)
+def test_documentation_and_aiter_evidence_preserves_selection_and_budget(label: str, node: str, budget: int) -> None:
+    step = _find_step(label)
+    argv = split(next(command for command in step["commands"] if "pytest -s" in command))
+    assert argv[0] == "pytest"
+    assert node in argv
+    assert argv[argv.index("-m") + 1] == "full_model and rocm and MI325 and cards_2"
+    assert argv[argv.index("--run-level") + 1] == "full_model"
+    assert "--collect-only" not in argv
+    assert step["agent_pool"] == "mi300_2"
+    assert step["timeout_in_minutes"] == budget
+    assert "retry" not in step
+    if label == "Qwen3-Omni Documentation Examples":
+        assert "qwen3-omni-doc-artifacts/**/*" in step["artifact_paths"]
+        assert 'export VLLM_ALLOW_LONG_MAX_MODEL_LEN="1"' in step["commands"]
+    else:
+        assert "export VLLM_ROCM_USE_AITER=1" in step["commands"]
 
 
 def test_quality_thresholds_are_not_weakened() -> None:

@@ -115,9 +115,33 @@ steps:
         timeout_in_minutes: 120
         artifact_paths:
           - qwen3-omni-doc-artifacts/**/*
+          - artifacts/rocm-qwen3-omni-documentation/**/*
         commands:
           - export VLLM_ALLOW_LONG_MAX_MODEL_LEN="1"
-          - pytest -s -v tests/examples/online_serving/test_qwen3_omni.py -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
+          - export ROCM_DOCUMENTATION_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-qwen3-omni-documentation"
+          - mkdir -p "$$ROCM_DOCUMENTATION_ARTIFACT_DIR"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/processes-before.txt"
+          - export ROCM_DOCUMENTATION_STARTED_EPOCH=$$(date +%s)
+          - >-
+            pytest -s -v -ra
+            tests/examples/online_serving/test_qwen3_omni.py
+            -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
+            --durations=0
+            --junitxml="$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest.xml"
+            2>&1 | tee "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest.log"
+          - echo "runtime_seconds=$$(( $$(date +%s) - ROCM_DOCUMENTATION_STARTED_EPOCH ))" >> "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/environment.txt"
+          - tail -n 100 "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest.log" > "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest-summary.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py pytest-result
+            --xml "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest.xml"
+            --log "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest.log"
+            --output "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/pytest-result.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_DOCUMENTATION_ARTIFACT_DIR/process-cleanup.txt"
 
       - label: "Qwen3-Omni AITER-on Smoke"
         agent_pool: mi300_2
@@ -125,9 +149,34 @@ steps:
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 90
+        artifact_paths:
+          - artifacts/rocm-qwen3-omni-aiter-smoke/**/*
         commands:
           - export VLLM_ROCM_USE_AITER=1
-          - pytest -s -v tests/e2e/online_serving/test_qwen3_omni_expansion.py::test_text_to_text_audio_001 -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
+          - export ROCM_AITER_SMOKE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-qwen3-omni-aiter-smoke"
+          - mkdir -p "$$ROCM_AITER_SMOKE_ARTIFACT_DIR"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment --output "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/processes-before.txt"
+          - export ROCM_AITER_SMOKE_STARTED_EPOCH=$$(date +%s)
+          - >-
+            pytest -s -v -ra
+            tests/e2e/online_serving/test_qwen3_omni_expansion.py::test_text_to_text_audio_001
+            -m "full_model and rocm and MI325 and cards_2" --run-level "full_model"
+            --durations=0
+            --junitxml="$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest.xml"
+            2>&1 | tee "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest.log"
+          - echo "runtime_seconds=$$(( $$(date +%s) - ROCM_AITER_SMOKE_STARTED_EPOCH ))" >> "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/environment.txt"
+          - tail -n 100 "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest.log" > "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest-summary.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py pytest-result
+            --xml "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest.xml"
+            --log "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest.log"
+            --output "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/pytest-result.txt"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_AITER_SMOKE_ARTIFACT_DIR/process-cleanup.txt"
 
   - group: ":speaker: CosyVoice3 MI300 Nightly"
     steps:

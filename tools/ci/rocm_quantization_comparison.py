@@ -19,8 +19,10 @@ def pytest_runtest_call(item):
     if mode == "skinny_disabled":
         assert item.callspec.params["config"].id == "fp8_z_image"
         assert os.environ["VLLM_ROCM_USE_SKINNY_GEMM"] == "0"
-    elif mode == "unpinned_offload":
+    elif mode in ("unpinned_offload", "flux_movement_trace"):
         assert item.callspec.params["config"].id == "fp8_flux2_dev_text_encoder"
+    elif mode == "fp8_routing_trace":
+        assert item.callspec.params["config"].id == "fp8_z_image"
     else:
         raise ValueError(f"Unknown diagnostic comparison: {mode}")
 
@@ -32,6 +34,9 @@ def pytest_runtest_call(item):
             # plan; only host pinning changes for this controlled comparison.
             assert "pin_cpu_memory" not in values
             values["pin_cpu_memory"] = False
+        elif mode in ("flux_movement_trace", "fp8_routing_trace"):
+            assert "worker_extension_cls" not in values
+            values["worker_extension_cls"] = "rocm_quantization_worker_trace.RocmQuantizationTrace"
         print("ROCM_QUANT_COMPARISON " + json.dumps({"mode": mode, "omni_kwargs": values}), flush=True)
         return values
 

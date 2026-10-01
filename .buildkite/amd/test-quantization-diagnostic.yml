@@ -2,7 +2,7 @@
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
-      - label: "Z-Image FP8 quality · skinny GEMM disabled comparison"
+      - label: "Z-Image FP8 quality · layer routing and numerical trace"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
@@ -13,13 +13,12 @@ steps:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=skinny_disabled
-          - export VLLM_ROCM_USE_SKINNY_GEMM=0
+          - export ROCM_QUANT_COMPARISON=fp8_routing_trace
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
             --case fp8_z_image
             --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/fp8_z_image"
-      - label: "Flux2 FP8 text encoder · unpinned offload comparison"
+      - label: "Flux2 FP8 text encoder · component movement trace"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
@@ -30,7 +29,7 @@ steps:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=unpinned_offload
+          - export ROCM_QUANT_COMPARISON=flux_movement_trace
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
             --case fp8_flux2_dev_text_encoder

@@ -1,0 +1,56 @@
+# Validation draft only. Replay the complete unchanged production parity lanes.
+steps:
+  - group: "ROCm production parity audio diagnostics"
+    steps:
+      - label: "Omni Function 2-GPU · retained production response audio"
+        agent_pool: mi300_2
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 100
+        artifact_paths:
+          - "artifacts/rocm-parity-audio-omni-2gpu/**/*"
+        commands:
+          - export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+          - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-parity-audio-omni-2gpu"
+          - mkdir -p "$$ROCM_CI_ARTIFACT_DIR"
+          - >-
+            BUILDKITE_COMMIT=bbc0f5718b4439d068c92121ac4d52e4bd8adf30
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment
+            --output "$$ROCM_CI_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_function_audio.py"
+            --case omni_2gpu
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-parity-audio-omni-2gpu"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_CI_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_CI_ARTIFACT_DIR/process-cleanup.txt"
+      - label: "TTS Function 1-GPU · retained production response audio"
+        agent_pool: mi300_1
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 130
+        artifact_paths:
+          - "artifacts/rocm-parity-audio-tts-1gpu/**/*"
+        commands:
+          - export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+          - export VLLM_USE_DEEP_GEMM=0
+          - export VLLM_MOE_USE_DEEP_GEMM=0
+          - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-parity-audio-tts-1gpu"
+          - mkdir -p "$$ROCM_CI_ARTIFACT_DIR"
+          - >-
+            BUILDKITE_COMMIT=bbc0f5718b4439d068c92121ac4d52e4bd8adf30
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment
+            --output "$$ROCM_CI_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_function_audio.py"
+            --case tts_1gpu
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-parity-audio-tts-1gpu"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_CI_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_CI_ARTIFACT_DIR/process-cleanup.txt"

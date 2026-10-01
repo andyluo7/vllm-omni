@@ -89,7 +89,7 @@ class SequentialOffloadHook(ModelHook):
         if rocm:
             release_cached_pinned_memory()
         try:
-            if rocm and pin_memory and target_device.type == "cpu":
+            if rocm and pin_memory and target_device == torch.device("cpu"):
                 moved = move_module_to_pinned_cpu(module, non_blocking=non_blocking)
                 if moved is not None:
                     return moved

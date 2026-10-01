@@ -9,6 +9,15 @@ from pathlib import Path
 
 
 def verify(evidence: dict) -> dict:
+    from vllm.config import VllmConfig, set_current_vllm_config
+
+    # Match upstream's default_vllm_config fixture for standalone CustomOps,
+    # including the compiled cast and kernel construction/forward execution.
+    with set_current_vllm_config(VllmConfig()):
+        return _verify_kernel(evidence)
+
+
+def _verify_kernel(evidence: dict) -> dict:
     import torch
     from rocm_quantization_worker_trace import _source_identity
     from vllm.model_executor.kernels.linear import init_fp8_linear_kernel

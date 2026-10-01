@@ -85,6 +85,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    inherited_allocator_config = os.environ.get("PYTORCH_ALLOC_CONF", os.environ.get("PYTORCH_CUDA_ALLOC_CONF", ""))
+    if os.environ["ROCM_QUANT_COMPARISON"] == "flux_pinned_cache_cap":
+        options = [value for value in inherited_allocator_config.split(",") if value]
+        if any(value.split(":", 1)[0] == "pinned_max_cached_size_mb" for value in options):
+            raise RuntimeError("Inherited pinned cache limit would confound the comparison")
+        # Preserve inherited device-allocator options. Torch reads this in the
+        # fresh pytest child before any model allocation occurs.
+        os.environ["PYTORCH_ALLOC_CONF"] = ",".join([*options, "pinned_max_cached_size_mb:1024"])
     digest = hashlib.sha256(TEST.read_bytes()).hexdigest()
     if digest != TEST_SHA256:
         raise RuntimeError(f"Quality source changed: {digest}")
@@ -116,6 +124,7 @@ def main() -> int:
         "test_sha256": digest,
         "command": command,
         "image_source": "d7f463a646641c022dd929e5b3286f15f51d9f01",
+        "inherited_allocator_config": inherited_allocator_config,
         "environment": {
             name: os.environ.get(name)
             for name in (
@@ -125,6 +134,8 @@ def main() -> int:
                 "VLLM_CI_EXPECTED_GPU_COUNT",
                 "VLLM_ROCM_USE_SKINNY_GEMM",
                 "ROCM_QUANT_COMPARISON",
+                "PYTORCH_ALLOC_CONF",
+                "PYTORCH_CUDA_ALLOC_CONF",
                 "BUILDKITE_COMMIT",
                 "BUILDKITE_JOB_ID",
             )

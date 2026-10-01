@@ -1,36 +1,20 @@
-# Validation draft only. Reuse the exact d7 quality source/image and gates.
+# Validation draft only. Preserve original pinned/offload behavior and quality gates.
 steps:
   - group: "ROCm quantization diagnostics"
     steps:
-      - label: "Z-Image FP8 quality · per-token activation scaling"
+      - label: "Flux2 quality · bounded pinned-host allocator cache"
         agent_pool: mi300_1
         mirror_hardwares: [amdproduction]
         grade: NonBlocking
         timeout_in_minutes: 100
         artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/zimage_per_token/**/*"
+          - "artifacts/rocm-quant-diagnostic/flux_pinned_cache_cap/**/*"
         commands:
           - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
           - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
           - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=zimage_per_token
+          - export ROCM_QUANT_COMPARISON=flux_pinned_cache_cap
           - >-
             python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
-            --case fp8_z_image
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_per_token"
-      - label: "Z-Image FP8 quality · per-token and per-channel scaling"
-        agent_pool: mi300_1
-        mirror_hardwares: [amdproduction]
-        grade: NonBlocking
-        timeout_in_minutes: 100
-        artifact_paths:
-          - "artifacts/rocm-quant-diagnostic/zimage_ptpc/**/*"
-        commands:
-          - export DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA
-          - export VLLM_OMNI_TEST_INIT_TIMEOUT=1800
-          - export VLLM_OMNI_TEST_STAGE_INIT_TIMEOUT=1200
-          - export ROCM_QUANT_COMPARISON=zimage_ptpc
-          - >-
-            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_quantization.py"
-            --case fp8_z_image
-            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/zimage_ptpc"
+            --case fp8_flux2_dev_text_encoder
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-quant-diagnostic/flux_pinned_cache_cap"

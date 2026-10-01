@@ -36,6 +36,20 @@ def _memory():
                 fields[name] = handle.read(8192).decode("utf-8", "replace")
         except OSError:
             pass
+    # ROCm exposes pinned allocator statistics through this Torch namespace.
+    # Keep absence of the optional telemetry API visible in the diagnostic.
+    import torch
+
+    stats = getattr(torch.cuda, "host_memory_stats", None)
+    if stats is not None:
+        try:
+            fields["pinned_host_allocator"] = {
+                key: value for key, value in stats().items() if key.endswith((".current", ".peak"))
+            }
+        except Exception as exc:
+            fields["pinned_host_allocator_error"] = type(exc).__name__ + ": " + str(exc)
+    else:
+        fields["pinned_host_allocator_error"] = "host_memory_stats unavailable"
     return fields
 
 
@@ -379,7 +393,10 @@ class RocmQuantizationTrace:
     def __init__(self, *args, **kwargs):
         mode = os.environ["ROCM_QUANT_COMPARISON"]
         if mode not in _INSTALLED:
-            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy"):
+            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy", "flux_pinned_cache_cap"):
+                if mode == "flux_pinned_cache_cap":
+                    assert "pinned_max_cached_size_mb:1024" in os.environ["PYTORCH_ALLOC_CONF"].split(",")
+                    _emit("pinned_allocator_config", value=os.environ["PYTORCH_ALLOC_CONF"])
                 _install_flux_trace(blocking_cpu_copy=mode == "flux_blocking_cpu_copy")
             elif mode in ("fp8_routing_trace", "zimage_encoder_bf16", "zimage_transformer_bf16"):
                 component = {

@@ -1,0 +1,32 @@
+# Validation draft only. Preserve the production test and its existing gates.
+env:
+  HF_HUB_DOWNLOAD_TIMEOUT: "300"
+  HF_HUB_ETAG_TIMEOUT: "60"
+  VLLM_WORKER_MULTIPROC_METHOD: "spawn"
+steps:
+  - group: "ROCm MiniCPM window diagnostic"
+    steps:
+      - label: "MiniCPM continuous windows · unchanged inputs and completion gates"
+        agent_pool: mi300_1
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 55
+        artifact_paths:
+          - "artifacts/rocm-window-diagnostic/**/*"
+        commands:
+          - export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+          - export ROCM_CI_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-window-diagnostic"
+          - mkdir -p "$$ROCM_CI_ARTIFACT_DIR"
+          - >-
+            BUILDKITE_COMMIT=ad7c78e1589347c6b0580faf69afd107fdbaf5b1
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py environment
+            --output "$$ROCM_CI_ARTIFACT_DIR/environment.txt"
+          - python3 .buildkite/amd/scripts/rocm_ci_evidence.py processes --output "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_window.py"
+            --output "$$ROCM_CI_ARTIFACT_DIR"
+          - >-
+            python3 .buildkite/amd/scripts/rocm_ci_evidence.py cleanup
+            --before "$$ROCM_CI_ARTIFACT_DIR/processes-before.txt"
+            --after "$$ROCM_CI_ARTIFACT_DIR/processes-after.txt"
+            --output "$$ROCM_CI_ARTIFACT_DIR/process-cleanup.txt"

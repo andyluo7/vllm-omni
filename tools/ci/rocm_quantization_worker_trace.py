@@ -94,7 +94,7 @@ def _resolve_host_cache_release():
     return release
 
 
-def _install_flux_trace(*, blocking_cpu_copy=False, release_host_cache=False):
+def _install_flux_trace(*, blocking_cpu_copy=False, release_host_cache=False, packed_host_copy=False):
     from vllm_omni.diffusion.models.flux2.pipeline_flux2 import Flux2Pipeline
     from vllm_omni.diffusion.offloader.sequential_backend import ModelLevelOffloadBackend, SequentialOffloadHook
 
@@ -155,7 +155,12 @@ def _install_flux_trace(*, blocking_cpu_copy=False, release_host_cache=False):
                 memory=_memory(),
             )
         release_cache("before_move", move_count)
-        result = original_move(module, target_device, **kwargs)
+        if packed_host_copy and str(target_device) == "cpu":
+            from rocm_packed_host_offload import packed_to_cpu
+
+            result = packed_to_cpu(module, original_move=original_move, emit=_emit, **kwargs)
+        else:
+            result = original_move(module, target_device, **kwargs)
         release_cache("after_move", move_count)
         if trace:
             _emit(
@@ -526,10 +531,16 @@ class RocmQuantizationTrace:
     def __init__(self, *args, **kwargs):
         mode = os.environ["ROCM_QUANT_COMPARISON"]
         if mode not in _INSTALLED:
-            if mode in ("flux_movement_trace", "flux_blocking_cpu_copy", "flux_host_cache_release"):
+            if mode in (
+                "flux_movement_trace",
+                "flux_blocking_cpu_copy",
+                "flux_host_cache_release",
+                "flux_packed_host_copy",
+            ):
                 _install_flux_trace(
                     blocking_cpu_copy=mode == "flux_blocking_cpu_copy",
-                    release_host_cache=mode == "flux_host_cache_release",
+                    release_host_cache=mode in ("flux_host_cache_release", "flux_packed_host_copy"),
+                    packed_host_copy=mode == "flux_packed_host_copy",
                 )
             elif mode in ("fp8_routing_trace", "zimage_encoder_bf16", "zimage_transformer_bf16"):
                 component = {

@@ -19,7 +19,13 @@ def pytest_runtest_call(item):
     if mode == "skinny_disabled":
         assert item.callspec.params["config"].id == "fp8_z_image"
         assert os.environ["VLLM_ROCM_USE_SKINNY_GEMM"] == "0"
-    elif mode in ("unpinned_offload", "flux_movement_trace", "flux_blocking_cpu_copy", "flux_host_cache_release"):
+    elif mode in (
+        "unpinned_offload",
+        "flux_movement_trace",
+        "flux_blocking_cpu_copy",
+        "flux_host_cache_release",
+        "flux_packed_host_copy",
+    ):
         assert item.callspec.params["config"].id == "fp8_flux2_dev_text_encoder"
     elif mode in (
         "fp8_routing_trace",
@@ -45,6 +51,7 @@ def pytest_runtest_call(item):
             "flux_movement_trace",
             "flux_blocking_cpu_copy",
             "flux_host_cache_release",
+            "flux_packed_host_copy",
             "fp8_routing_trace",
             "zimage_encoder_bf16",
             "zimage_transformer_bf16",

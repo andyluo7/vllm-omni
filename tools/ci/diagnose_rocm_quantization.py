@@ -137,6 +137,19 @@ def main() -> int:
     }
     (args.output / "identity.json").write_text(json.dumps(identity, indent=2))
     print(json.dumps(identity), flush=True)
+    if os.environ["ROCM_QUANT_COMPARISON"] == "flux_packed_host_copy":
+        preflight = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("verify_rocm_packed_host_offload.py")),
+                "--output",
+                str(args.output / "packed-host-preflight.json"),
+            ],
+            timeout=120,
+            check=False,
+        )
+        if preflight.returncode:
+            return preflight.returncode
     if os.environ["ROCM_QUANT_COMPARISON"] == "flux_host_cache_release":
         # Check the exact image before allocating any model. No allocator
         # environment setting changes; unsupported capability stops this run.

@@ -203,6 +203,8 @@ def main() -> int:
     print("ROCM_QUANT_RESULT " + json.dumps(final), flush=True)
     if final["timed_out"]:
         return 124
+    if interrupted:
+        return 143
     return code if code >= 0 else 128 - code
 
 

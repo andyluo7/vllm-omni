@@ -1,0 +1,19 @@
+# Validation draft only. Use the original d7 suite, settings, and exact image.
+steps:
+  - group: "ROCm Function Expansion audio diagnostic"
+    steps:
+      - label: "Qwen3-Omni Function Expansion · retained audio diagnostic"
+        agent_pool: mi300_2
+        mirror_hardwares: [amdproduction]
+        grade: NonBlocking
+        timeout_in_minutes: 180
+        artifact_paths:
+          - "artifacts/rocm-function-audio-diagnostic/**/*"
+        commands:
+          - export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+          - export VLLM_CI_QWEN3_OMNI_SEED=42
+          - export PYTHONHASHSEED=42
+          - >-
+            python3 "$$BUILDKITE_BUILD_CHECKOUT_PATH/tools/ci/diagnose_rocm_function_audio.py"
+            --case function_expansion
+            --output "$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-function-audio-diagnostic"

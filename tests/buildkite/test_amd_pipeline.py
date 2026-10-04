@@ -14,8 +14,10 @@ AMD_NIGHTLY_PIPELINE = Path(".buildkite/amd/test-amd-nightly.yml")
 AMD_READY_PIPELINE = Path(".buildkite/amd/test-amd-ready.yml")
 AMD_TEMPLATE = Path(".buildkite/amd/test-template-amd-omni.j2")
 AR_PAGED_ATTENTION_LABEL = "ROCm · AR Diffusion Paged Attention GPU Test"
+AITER_COVERAGE_LABEL = "ROCm · FlashAttention/AITER GPU Coverage"
 DIFFUSION_GROUP = ":card_index_dividers: Diffusion Test"
 AR_PAGED_ATTENTION_MARKERS = "core_model and rocm and MI325 and cards_1"
+MAMMOTH_ATTENTION_TEST = "tests/diffusion/models/mammoth_moda2/test_dit_attention_cuda.py"
 
 
 def _find_step(label: str, pipeline_path: Path = AMD_MERGE_PIPELINE) -> dict:
@@ -97,6 +99,39 @@ def test_ready_diffusion_cpu_suite_is_sharded() -> None:
     assert step["timeout_in_minutes"] == 45
     assert "--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT" in pytest_command
     assert "--shard-id=$$BUILDKITE_PARALLEL_JOB" in pytest_command
+
+
+def test_mammoth_attention_tests_reuse_ready_aiter_cache() -> None:
+    aiter_step = _find_step(AITER_COVERAGE_LABEL, AMD_READY_PIPELINE)
+    model_step = _find_step("Diffusion · Model Test", AMD_READY_PIPELINE)
+
+    assert aiter_step["grade"] == "NonBlocking"
+    assert aiter_step["timeout_in_minutes"] == 60
+    assert 'export AITER_JIT_DIR="/tmp/vllm-omni-aiter-$$BUILDKITE_JOB_ID"' in aiter_step["commands"]
+    assert 'export TORCH_EXTENSIONS_DIR="/tmp/vllm-omni-torch-extensions-$$BUILDKITE_JOB_ID"' in aiter_step["commands"]
+
+    pytest_commands = [command for command in aiter_step["commands"] if "pytest" in command]
+    warmup_index = next(
+        index for index, command in enumerate(pytest_commands) if "tests/diffusion/attention/" in command
+    )
+    mammoth_index = next(index for index, command in enumerate(pytest_commands) if MAMMOTH_ATTENTION_TEST in command)
+    assert warmup_index < mammoth_index
+
+    mammoth_argv = split(pytest_commands[mammoth_index])
+    assert mammoth_argv[:4] == ["timeout", "--signal=TERM", "--kill-after=2m", "10m"]
+    assert mammoth_argv[mammoth_argv.index("-n") + 1] == "1"
+    assert MAMMOTH_ATTENTION_TEST in mammoth_argv
+    assert mammoth_argv[mammoth_argv.index("--run-level") + 1] == "core_model"
+
+    model_pytest_argv = [split(command) for command in model_step["commands"] if "pytest" in command]
+    generic_argv = next(argv for argv in model_pytest_argv if "tests/diffusion/models/" in argv)
+    assert f"--ignore={MAMMOTH_ATTENTION_TEST}" in generic_argv
+
+    blocking_mammoth_argv = next(argv for argv in model_pytest_argv if MAMMOTH_ATTENTION_TEST in argv)
+    assert blocking_mammoth_argv[:3] == ["timeout", "10m", "env"]
+    assert "DIFFUSION_ATTENTION_BACKEND=TORCH_SDPA" in blocking_mammoth_argv
+    assert MAMMOTH_ATTENTION_TEST in blocking_mammoth_argv
+    assert blocking_mammoth_argv[blocking_mammoth_argv.index("--run-level") + 1] == "core_model"
 
 
 def test_z_image_merge_timeout_covers_cold_aiter_compile() -> None:

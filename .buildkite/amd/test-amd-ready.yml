@@ -126,7 +126,6 @@ steps:
           timeout --signal=TERM --kill-after=2m 55m
           pytest -s -v -n 1
           tests/diffusion/attention/
-          tests/diffusion/utils/test_chunked_transfer.py
           -m 'core_model and rocm and MI325 and cards_1'
           --run-level "core_model"
 
@@ -148,6 +147,11 @@ steps:
           timeout --signal=TERM --kill-after=2m 15m
           pytest -sv tests/diffusion/ar_diffusion/test_paged_attention.py
           -m 'core_model and rocm and MI325 and cards_1' --run-level core_model
+        # Keep the pinned-ring device contract blocking without making the
+        # cold, experimental AITER coverage lane a required check.
+        - >-
+          timeout 5m pytest -sv tests/diffusion/utils/test_chunked_transfer.py
+          -m 'core_model and rocm and MI325 and cards_1' --run-level core_model
 
     - label: "Diffusion · Batch Test"
       agent_pool: mi300_1
@@ -155,7 +159,7 @@ steps:
       mirror_hardwares: [amdproduction]
       grade: Blocking
       commands:
-        - pytest -sv tests/diffusion/batching -m 'core_model and cuda' --run-level "core_model"
+        - pytest -sv tests/diffusion/batching -m 'core_model and rocm and MI325 and cards_1' --run-level "core_model"
 
     - label: "Diffusion · Offloader Test"
       agent_pool: mi300_1
@@ -165,7 +169,7 @@ steps:
       commands:
         - export VLLM_LOGGING_LEVEL=DEBUG
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
-        - pytest -s -v tests/diffusion/offloader -m "core_model and cuda" --run-level "core_model"
+        - pytest -s -v tests/diffusion/offloader -m "core_model and rocm and MI325 and cards_1" --run-level "core_model"
 
     - label: "Diffusion · Cache Test"
       agent_pool: mi300_1
@@ -176,7 +180,7 @@ steps:
         - export GPU_ARCHS=gfx942
         - export VLLM_LOGGING_LEVEL=DEBUG
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
-        - pytest -sv tests/diffusion/cache -m 'core_model and cuda' --run-level "core_model"
+        - pytest -sv tests/diffusion/cache -m 'core_model and rocm and MI325 and cards_1' --run-level "core_model"
 
     - label: "Diffusion Sequence Parallelism Test"
       agent_pool: mi300_2
@@ -210,6 +214,11 @@ steps:
         - >-
           timeout 20m pytest -s -v
           tests/diffusion/attention/test_ulysses_uaa.py
+          -m 'core_model and rocm and MI325 and cards_2'
+          --run-level "core_model"
+        - >-
+          timeout 20m pytest -s -v
+          tests/diffusion/attention/test_attention_sp.py
           -m 'core_model and rocm and MI325 and cards_2'
           --run-level "core_model"
 

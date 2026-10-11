@@ -129,12 +129,35 @@ steps:
 - group: ":card_index_dividers: Diffusion Test"
   steps:
     # test_padding_equivalence builds the dense and varlen AITER modules
-    # serially. Build those independent modules in parallel, transfer only the
-    # internal JIT cache entries, then run the unchanged selectors below.
+    # serially. Build the shared AITER core once, then build the independent MHA
+    # modules in parallel and run the unchanged selectors below.
+    - label: "ROCm · FlashAttention/AITER Core Prewarm"
+      key: rocm-flash-aiter-core-prewarm
+      agent_pool: mi300_1
+      depends_on: amd-build
+      mirror_hardwares: [amdproduction]
+      grade: NonBlocking
+      timeout_in_minutes: 10
+      artifact_paths:
+        - "artifacts/rocm-flash-aiter-cache/core/*.so"
+      commands:
+        - export VLLM_ROCM_USE_AITER=1
+        - export AITER_JIT_DIR="/tmp/vllm-omni-aiter-$$BUILDKITE_JOB_ID"
+        - export TORCH_EXTENSIONS_DIR="/tmp/vllm-omni-torch-extensions-$$BUILDKITE_JOB_ID"
+        - export FLASH_AITER_CACHE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-flash-aiter-cache/core"
+        - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_ARTIFACT_DIR"
+        - >-
+          timeout --signal=TERM --kill-after=2m 5m
+          python .buildkite/amd/scripts/prewarm_flash_aiter.py --variant core
+        - >-
+          cp -v
+          "$$AITER_JIT_DIR/module_aiter_core.so"
+          "$$FLASH_AITER_CACHE_ARTIFACT_DIR/"
+
     - label: "ROCm · FlashAttention/AITER Dense Prewarm"
       key: rocm-flash-aiter-dense-prewarm
       agent_pool: mi300_1
-      depends_on: amd-build
+      depends_on: rocm-flash-aiter-core-prewarm
       mirror_hardwares: [amdproduction]
       grade: NonBlocking
       timeout_in_minutes: 30
@@ -144,8 +167,18 @@ steps:
         - export VLLM_ROCM_USE_AITER=1
         - export AITER_JIT_DIR="/tmp/vllm-omni-aiter-$$BUILDKITE_JOB_ID"
         - export TORCH_EXTENSIONS_DIR="/tmp/vllm-omni-torch-extensions-$$BUILDKITE_JOB_ID"
+        - export FLASH_AITER_CACHE_DOWNLOAD_DIR="/tmp/vllm-omni-aiter-download-$$BUILDKITE_JOB_ID"
         - export FLASH_AITER_CACHE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-flash-aiter-cache/dense"
-        - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_ARTIFACT_DIR"
+        - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_DOWNLOAD_DIR" "$$FLASH_AITER_CACHE_ARTIFACT_DIR"
+        - >-
+          buildkite-agent artifact download
+          "artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
+          --step rocm-flash-aiter-core-prewarm
+        - >-
+          cp -v
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR/artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$AITER_JIT_DIR/"
         - >-
           timeout --signal=TERM --kill-after=2m 24m
           python .buildkite/amd/scripts/prewarm_flash_aiter.py --variant dense
@@ -157,7 +190,7 @@ steps:
     - label: "ROCm · FlashAttention/AITER Varlen Prewarm"
       key: rocm-flash-aiter-varlen-prewarm
       agent_pool: mi300_1
-      depends_on: amd-build
+      depends_on: rocm-flash-aiter-core-prewarm
       mirror_hardwares: [amdproduction]
       grade: NonBlocking
       timeout_in_minutes: 15
@@ -167,8 +200,18 @@ steps:
         - export VLLM_ROCM_USE_AITER=1
         - export AITER_JIT_DIR="/tmp/vllm-omni-aiter-$$BUILDKITE_JOB_ID"
         - export TORCH_EXTENSIONS_DIR="/tmp/vllm-omni-torch-extensions-$$BUILDKITE_JOB_ID"
+        - export FLASH_AITER_CACHE_DOWNLOAD_DIR="/tmp/vllm-omni-aiter-download-$$BUILDKITE_JOB_ID"
         - export FLASH_AITER_CACHE_ARTIFACT_DIR="$$BUILDKITE_BUILD_CHECKOUT_PATH/artifacts/rocm-flash-aiter-cache/varlen"
-        - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_ARTIFACT_DIR"
+        - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_DOWNLOAD_DIR" "$$FLASH_AITER_CACHE_ARTIFACT_DIR"
+        - >-
+          buildkite-agent artifact download
+          "artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
+          --step rocm-flash-aiter-core-prewarm
+        - >-
+          cp -v
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR/artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$AITER_JIT_DIR/"
         - >-
           timeout --signal=TERM --kill-after=2m 10m
           python .buildkite/amd/scripts/prewarm_flash_aiter.py --variant varlen
@@ -197,6 +240,11 @@ steps:
         - mkdir -p "$$AITER_JIT_DIR" "$$TORCH_EXTENSIONS_DIR" "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
         - >-
           buildkite-agent artifact download
+          "artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
+          --step rocm-flash-aiter-core-prewarm
+        - >-
+          buildkite-agent artifact download
           "artifacts/rocm-flash-aiter-cache/dense/mha_fwd_bf16_nbias_nmask_nlse_ndropout_nqscale.so"
           "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
           --step rocm-flash-aiter-dense-prewarm
@@ -205,6 +253,10 @@ steps:
           "artifacts/rocm-flash-aiter-cache/varlen/mha_varlen_fwd_bf16_nlogits_nbias_nmask_nlse_ndropout_nskip_nqscale.so"
           "$$FLASH_AITER_CACHE_DOWNLOAD_DIR"
           --step rocm-flash-aiter-varlen-prewarm
+        - >-
+          cp -v
+          "$$FLASH_AITER_CACHE_DOWNLOAD_DIR/artifacts/rocm-flash-aiter-cache/core/module_aiter_core.so"
+          "$$AITER_JIT_DIR/"
         - >-
           cp -v
           "$$FLASH_AITER_CACHE_DOWNLOAD_DIR/artifacts/rocm-flash-aiter-cache/dense/mha_fwd_bf16_nbias_nmask_nlse_ndropout_nqscale.so"

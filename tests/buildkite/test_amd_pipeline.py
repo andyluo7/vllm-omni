@@ -19,12 +19,15 @@ AMD_OMNI_PROCESSOR_RUNNER = Path(".buildkite/amd/scripts/run-omni-processor-test
 CUDA_MERGE_PIPELINE = Path(".buildkite/cuda/test-merge.yml")
 CUDA_READY_PIPELINE = Path(".buildkite/cuda/test-ready.yml")
 AR_PAGED_ATTENTION_LABEL = "ROCm · AR Diffusion Paged Attention GPU Test"
+FLASH_AITER_CORE_LABEL = "ROCm · FlashAttention/AITER Core Prewarm"
 FLASH_AITER_DENSE_LABEL = "ROCm · FlashAttention/AITER Dense Prewarm"
 FLASH_AITER_VARLEN_LABEL = "ROCm · FlashAttention/AITER Varlen Prewarm"
 FLASH_AITER_VALIDATION_LABEL = "ROCm · FlashAttention/AITER GPU Coverage"
+FLASH_AITER_CORE_KEY = "rocm-flash-aiter-core-prewarm"
 FLASH_AITER_DENSE_KEY = "rocm-flash-aiter-dense-prewarm"
 FLASH_AITER_VARLEN_KEY = "rocm-flash-aiter-varlen-prewarm"
 FLASH_AITER_VALIDATION_KEY = "rocm-flash-aiter-validation"
+FLASH_AITER_CORE_MODULE = "module_aiter_core.so"
 FLASH_AITER_DENSE_MODULE = "mha_fwd_bf16_nbias_nmask_nlse_ndropout_nqscale.so"
 FLASH_AITER_VARLEN_MODULE = "mha_varlen_fwd_bf16_nlogits_nbias_nmask_nlse_ndropout_nskip_nqscale.so"
 FLASH_AITER_MARKERS = "core_model and rocm and MI325 and cards_1"
@@ -359,18 +362,20 @@ def test_joy_gpu_lane_is_not_on_amd_ready_or_merge_critical_path(pipeline_path: 
     assert not _find_joy_gpu_steps(pipeline_path)
 
 
-def test_ready_flash_aiter_prewarm_shards_are_parallel_nonblocking_cache_producers() -> None:
+def test_ready_flash_aiter_prewarm_shards_are_staged_nonblocking_cache_producers() -> None:
+    core = _find_step(FLASH_AITER_CORE_LABEL, AMD_READY_PIPELINE)
     dense = _find_step(FLASH_AITER_DENSE_LABEL, AMD_READY_PIPELINE)
     varlen = _find_step(FLASH_AITER_VARLEN_LABEL, AMD_READY_PIPELINE)
 
     expected = (
-        (dense, FLASH_AITER_DENSE_KEY, "dense", FLASH_AITER_DENSE_MODULE),
-        (varlen, FLASH_AITER_VARLEN_KEY, "varlen", FLASH_AITER_VARLEN_MODULE),
+        (core, FLASH_AITER_CORE_KEY, "core", FLASH_AITER_CORE_MODULE, "amd-build"),
+        (dense, FLASH_AITER_DENSE_KEY, "dense", FLASH_AITER_DENSE_MODULE, FLASH_AITER_CORE_KEY),
+        (varlen, FLASH_AITER_VARLEN_KEY, "varlen", FLASH_AITER_VARLEN_MODULE, FLASH_AITER_CORE_KEY),
     )
-    for step, key, variant, module in expected:
+    for step, key, variant, module, dependency in expected:
         assert step["key"] == key
         assert step["agent_pool"] == "mi300_1"
-        assert step["depends_on"] == "amd-build"
+        assert step["depends_on"] == dependency
         assert step["mirror_hardwares"] == ["amdproduction"]
         assert step["grade"] == "NonBlocking"
         assert "parallelism" not in step
@@ -381,12 +386,21 @@ def test_ready_flash_aiter_prewarm_shards_are_parallel_nonblocking_cache_produce
         assert f"--variant {variant}" in prewarm
         assert any(module in command and command.lstrip().startswith("cp -v") for command in step["commands"])
 
+    assert core["timeout_in_minutes"] == 10
     assert dense["timeout_in_minutes"] == 30
     assert varlen["timeout_in_minutes"] == 15
+    assert core["artifact_paths"] == ["artifacts/rocm-flash-aiter-cache/core/*.so"]
     assert dense["artifact_paths"] == ["artifacts/rocm-flash-aiter-cache/dense/*.so"]
     assert varlen["artifact_paths"] == ["artifacts/rocm-flash-aiter-cache/varlen/*.so"]
+    assert "5m" in next(command for command in core["commands"] if "prewarm_flash_aiter.py" in command)
     assert "24m" in next(command for command in dense["commands"] if "prewarm_flash_aiter.py" in command)
     assert "10m" in next(command for command in varlen["commands"] if "prewarm_flash_aiter.py" in command)
+
+    for step in (dense, varlen):
+        downloads = [command for command in step["commands"] if "buildkite-agent artifact download" in command]
+        assert len(downloads) == 1
+        assert FLASH_AITER_CORE_KEY in downloads[0]
+        assert FLASH_AITER_CORE_MODULE in downloads[0]
 
 
 def test_ready_flash_aiter_validation_preserves_selectors_and_result_artifacts() -> None:
@@ -405,7 +419,8 @@ def test_ready_flash_aiter_validation_preserves_selectors_and_result_artifacts()
     assert 'export TORCH_EXTENSIONS_DIR="/tmp/vllm-omni-torch-extensions-$$BUILDKITE_JOB_ID"' in step["commands"]
 
     downloads = [command for command in step["commands"] if "buildkite-agent artifact download" in command]
-    assert len(downloads) == 2
+    assert len(downloads) == 3
+    assert any(FLASH_AITER_CORE_KEY in command and FLASH_AITER_CORE_MODULE in command for command in downloads)
     assert any(FLASH_AITER_DENSE_KEY in command and FLASH_AITER_DENSE_MODULE in command for command in downloads)
     assert any(FLASH_AITER_VARLEN_KEY in command and FLASH_AITER_VARLEN_MODULE in command for command in downloads)
 

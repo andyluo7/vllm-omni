@@ -182,7 +182,7 @@ upload_pipeline() {
         TEST_YAML="${TEST_SPECS[0]#*:}"
     else
         TEST_YAML=$(mktemp "${TMPDIR:-/tmp}/amd-selected-tests.XXXXXX.yml")
-        python scripts/combine_test_suites.py "$TEST_YAML" "${TEST_SPECS[@]}"
+        python3 scripts/combine_test_suites.py "$TEST_YAML" "${TEST_SPECS[@]}"
     fi
     echo "AMD test suites: ${TEST_SPECS[*]}"
 

@@ -215,6 +215,80 @@ def test_combiner_deduplicates_only_identical_cross_suite_steps(
     assert "Deduplicated 1 identical MERGE_TESTS step definitions (2 jobs)." in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    "difference",
+    [
+        {"commands": ["pytest tests/other.py"]},
+        {"grade": "NonBlocking"},
+        {"env": {"BACKEND": "other"}},
+        {"timeout_in_minutes": 30},
+        {"retry": {"automatic": [{"exit_status": 134, "limit": 1}]}},
+        {"artifact_paths": ["artifacts/other/*.xml"]},
+        {"agent_pool": "mi300_2"},
+        {"mirror_hardwares": ["amdtentative"]},
+        {"parallelism": 2},
+        {"depends_on": "another-build"},
+    ],
+)
+def test_combiner_retains_same_label_with_a_different_execution_contract(tmp_path, difference):
+    ready = {"label": "shared", "commands": ["pytest tests/shared.py"], "grade": "Blocking"}
+    merge = ready | difference
+    ready_path = tmp_path / "ready.yml"
+    merge_path = tmp_path / "merge.yml"
+    _write_suite(ready_path, {"steps": [ready]})
+    _write_suite(merge_path, {"steps": [merge]})
+
+    combined = COMBINER.combine_test_suites((f"READY_TESTS:{ready_path}", f"MERGE_TESTS:{merge_path}"))
+
+    assert combined["steps"] == [
+        {"group": "READY_TESTS", "steps": [ready]},
+        {"group": "MERGE_TESTS", "steps": [merge]},
+    ]
+
+
+def test_combiner_preserves_duplicates_within_one_suite(tmp_path):
+    shared = {"label": "repeat", "commands": ["pytest tests/shared.py"]}
+    ready_path = tmp_path / "ready.yml"
+    merge_path = tmp_path / "merge.yml"
+    _write_suite(ready_path, {"steps": [shared, shared]})
+    _write_suite(merge_path, {"steps": [shared]})
+
+    combined = COMBINER.combine_test_suites((f"READY_TESTS:{ready_path}", f"MERGE_TESTS:{merge_path}"))
+
+    assert combined["steps"] == [{"group": "READY_TESTS", "steps": [shared, shared]}]
+
+
+def test_combiner_accepts_every_selector_tier(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "select_test_suites", REPO_ROOT / ".buildkite/amd/scripts/select_test_suites.py"
+    )
+    assert spec is not None and spec.loader is not None
+    selector = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(selector)
+    specs = []
+    expected_groups = []
+    for suite_spec in selector.SUITE_SPECS.values():
+        group, filename = suite_spec.split(":", 1)
+        path = tmp_path / filename
+        _write_suite(path, {"steps": [{"label": group, "commands": [f"pytest tests/{group}.py"]}]})
+        specs.append(f"{group}:{path}")
+        expected_groups.append(group)
+
+    output_path = tmp_path / "combined.yml"
+    result = subprocess.run(
+        [sys.executable, str(COMBINER_PATH), str(output_path), *specs],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    )
+    assert not result.stderr
+    combined = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+
+    assert [group["group"] for group in combined["steps"]] == expected_groups
+
+
 def test_combiner_rejects_conflicting_suite_environment(tmp_path):
     ready_path = tmp_path / "ready.yml"
     merge_path = tmp_path / "merge.yml"

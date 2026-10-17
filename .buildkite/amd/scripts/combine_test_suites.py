@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-SUITE_GROUPS = frozenset({"READY_TESTS", "MERGE_TESTS", "NIGHTLY_TESTS"})
+SUITE_GROUPS = frozenset({"READY_TESTS", "MERGE_TESTS", "NIGHTLY_TESTS", "WEEKLY_TESTS"})
 
 
 def _parse_suite_spec(suite_spec: str) -> tuple[str, Path]:

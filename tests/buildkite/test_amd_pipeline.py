@@ -15,7 +15,7 @@ AMD_NIGHTLY_PIPELINE = Path(".buildkite/amd/test-amd-nightly.yml")
 AMD_WEEKLY_PIPELINE = Path(".buildkite/amd/test-amd-weekly.yml")
 AMD_READY_PIPELINE = Path(".buildkite/amd/test-amd-ready.yml")
 AMD_BOOTSTRAP = Path(".buildkite/amd/scripts/bootstrap-amd-omni.sh")
-AMD_SUITE_COMBINER = Path(".buildkite/amd/scripts/combine_test_suites.py")
+AMD_SUITE_COMBINER = Path(__file__).resolve().parents[2] / ".buildkite/amd/scripts/combine_test_suites.py"
 AMD_RUNNER = Path(".buildkite/amd/scripts/run-amd-test.sh")
 AMD_TEMPLATE = Path(".buildkite/amd/test-template-amd-omni.j2")
 AMD_OMNI_PROCESSOR_RUNNER = Path(".buildkite/amd/scripts/run-omni-processor-test.sh")
@@ -279,6 +279,20 @@ def test_ready_merge_composition_preserves_the_structural_union() -> None:
     assert sum(step.get("parallelism", 1) for step in combined_steps) < sum(
         step.get("parallelism", 1) for step in ready_steps + merge_steps
     )
+
+
+@pytest.mark.parametrize("extra_pipeline", [AMD_NIGHTLY_PIPELINE, AMD_WEEKLY_PIPELINE], ids=["nightly", "weekly"])
+def test_combined_extra_tier_preserves_every_distinct_step(extra_pipeline: Path) -> None:
+    pipelines = [AMD_READY_PIPELINE, AMD_MERGE_PIPELINE, extra_pipeline]
+    extra_group = "NIGHTLY_TESTS" if extra_pipeline == AMD_NIGHTLY_PIPELINE else "WEEKLY_TESTS"
+    groups = ["READY_TESTS", "MERGE_TESTS", extra_group]
+    raw_signatures = {_step_signature(step) for path in pipelines for step in _leaf_steps(path)}
+
+    combined = COMBINER.combine_test_suites(tuple(f"{group}:{path}" for group, path in zip(groups, pipelines)))
+    combined_signatures = [_step_signature(step) for group in combined["steps"] for step in group["steps"]]
+
+    assert len(combined_signatures) == len(set(combined_signatures))
+    assert set(combined_signatures) == raw_signatures
 
 
 def test_omni_processor_full_matrix_moves_to_nightly_with_blocking_rocm_smoke() -> None:

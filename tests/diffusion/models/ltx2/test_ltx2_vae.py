@@ -164,6 +164,34 @@ def test_ltx_base_vocoder_uses_fp32_on_rocm(monkeypatch):
     assert output.dtype == torch.bfloat16
 
 
+def test_ltx_base_vocoder_restores_dtype_when_fp32_conversion_fails(monkeypatch):
+    import vllm_omni.diffusion.models.ltx2.ltx2_runtime as ltx_runtime
+
+    class FailingBaseVocoder(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.ones(1, dtype=torch.bfloat16))
+            self.restored_dtype = None
+
+        def float(self):
+            self.weight.data = self.weight.data.float()
+            raise RuntimeError("injected conversion failure")
+
+        def to(self, dtype):
+            self.weight.data = self.weight.data.to(dtype)
+            self.restored_dtype = dtype
+            return self
+
+    monkeypatch.setattr(ltx_runtime, "_is_rocm_device", lambda _device_type: True)
+    vocoder = FailingBaseVocoder()
+
+    with pytest.raises(RuntimeError, match="injected conversion failure"):
+        ltx_runtime._run_ltx_vocoder(vocoder, torch.ones(1, dtype=torch.bfloat16))
+
+    assert vocoder.weight.dtype == torch.bfloat16
+    assert vocoder.restored_dtype == torch.bfloat16
+
+
 def test_ltx_parameterless_base_vocoder_uses_fp32_on_rocm(monkeypatch):
     import vllm_omni.diffusion.models.ltx2.ltx2_runtime as ltx_runtime
 

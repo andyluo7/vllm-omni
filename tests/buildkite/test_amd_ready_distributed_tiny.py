@@ -44,7 +44,7 @@ def test_new_ready_jobs_follow_rocm_evidence_contract(label: str, artifact_dir: 
 
     assert step["agent_pool"] == "mi300_1"
     assert step["grade"] == "NonBlocking"
-    expected_timeout = 60 if label == TINY_BASE_LABEL else 30
+    expected_timeout = 75 if label == TINY_BASE_LABEL else 30
     assert step["timeout_in_minutes"] == expected_timeout
     assert step["artifact_paths"] == [f"{artifact_dir}/**/*"]
     assert len(pytest_commands) == (4 if label == TINY_BASE_LABEL else 1)
@@ -74,6 +74,8 @@ def test_distributed_cuda_scope_contains_rocm_runnable_gpu_smokes() -> None:
         encoding="utf-8"
     )
     assert source.count('@hardware_test(res={"cuda": "L4"}, num_cards=1)') == 2
+    assert "pytestmark = [pytest.mark.parallel, pytest.mark.core_model]" in source
+    assert "pytestmark = [pytest.mark.cpu" not in source
 
 
 def test_tiny_base_job_matches_current_cuda_scope() -> None:

@@ -18,11 +18,12 @@ from vllm_omni.distributed.omni_connectors.connectors.mooncake_transfer_engine_c
 )
 from vllm_omni.distributed.omni_connectors.kv_transfer_manager import KVCacheTransferData
 
-# Most tests in this file are pure-CPU unit tests; CUDA smoke tests are skip-guarded.
-pytestmark = [pytest.mark.cpu, pytest.mark.parallel, pytest.mark.core_model]
+# Keep the shared execution markers at module scope. CPU markers are attached
+# only to CPU tests so the GPU smokes do not also enter CPU catch-all jobs.
+pytestmark = [pytest.mark.parallel, pytest.mark.core_model]
 
 
-@pytest.mark.core_model
+@pytest.mark.cpu
 class TestBufferAllocator:
     """Unit tests for BufferAllocator."""
 
@@ -88,6 +89,7 @@ class TestBufferAllocator:
         assert len(errors) == 0, f"Thread safety errors: {errors}"
 
 
+@pytest.mark.cpu
 class TestAllocatorInvariants:
     """
     Defensive invariant tests for BufferAllocator: double-free, partial
@@ -186,7 +188,6 @@ class TestAllocatorInvariants:
         assert offset == 0
 
 
-@pytest.mark.core_model
 class TestManagedBuffer:
     """Unit tests for ManagedBuffer."""
 
@@ -196,6 +197,7 @@ class TestManagedBuffer:
         self.allocator = BufferAllocator(total_size=4096, alignment=64)
         self.pool = torch.zeros(4096, dtype=torch.uint8)
 
+    @pytest.mark.cpu
     def test_tensor_view(self):
         """Verify tensor property and as_tensor return correct views."""
         offset = self.allocator.alloc(64)
@@ -215,6 +217,7 @@ class TestManagedBuffer:
 
         buf.release()
 
+    @pytest.mark.cpu
     def test_context_manager_releases_buffer(self):
         """Verify context manager releases buffer and space is reusable."""
         offset = self.allocator.alloc(128)
@@ -228,6 +231,7 @@ class TestManagedBuffer:
         new_offset = self.allocator.alloc(128)
         assert new_offset == offset
 
+    @pytest.mark.cpu
     def test_to_bytes_cpu_pool(self):
         """Smoke-test Mooncake's ManagedBuffer byte extraction on CPU pools."""
         expected = bytes(range(64))
@@ -275,6 +279,7 @@ def _make_kv_payload(device: str | torch.device = "cpu") -> tuple[KVCacheTransfe
 class TestMooncakePackedPayloadSmoke:
     """Smoke tests for Mooncake raw payload helpers without real Mooncake/RDMA."""
 
+    @pytest.mark.cpu
     def test_load_header_from_cpu_tensor(self):
         payload, _, _ = _make_kv_payload()
         raw = payload.to_bytes()

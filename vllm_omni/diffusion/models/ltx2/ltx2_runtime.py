@@ -133,9 +133,9 @@ def _run_ltx_vocoder(vocoder: nn.Module, generated_mel: torch.Tensor) -> torch.T
                 input_dtype = generated_mel.dtype
                 parameter = next(vocoder.parameters(), None)
                 module_dtype = parameter.dtype if parameter is not None else None
-                if module_dtype is not None and module_dtype != torch.float32:
-                    vocoder.float()
                 try:
+                    if module_dtype is not None and module_dtype != torch.float32:
+                        vocoder.float()
                     return vocoder(generated_mel.float()).to(input_dtype)
                 finally:
                     if module_dtype is not None and module_dtype != torch.float32:

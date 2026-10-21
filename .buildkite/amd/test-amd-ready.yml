@@ -558,7 +558,9 @@ steps:
   depends_on: amd-build
   mirror_hardwares: [amdproduction]
   grade: NonBlocking
-  timeout_in_minutes: 60
+  # The four serial pytest partitions can consume up to 65 minutes. Keep ten
+  # additional minutes for environment capture, summaries, and leak checks.
+  timeout_in_minutes: 75
   artifact_paths:
     - "artifacts/rocm-tiny-diffusion-base/**/*"
   commands:

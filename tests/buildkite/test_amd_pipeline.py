@@ -1859,3 +1859,86 @@ def test_qwen_image_expansion_executes_junit_guard_before_exit(
         timeout_status=timeout_status,
         expected_status=expected_status,
     )
+
+
+_MINICPMO_READY_MARKER = "core_model and omni and rocm and MI325 and cards_1"
+_MINICPMO_READY_JOBS = (
+    (
+        "ROCm · MiniCPM-o 4.5 Offline Coverage",
+        30,
+        "20m",
+        "artifacts/rocm-minicpmo-45-offline",
+        (
+            "tests/e2e/offline_inference/test_minicpmo_4_5.py::test_text_to_text[omni_runner0]",
+            "tests/e2e/offline_inference/test_minicpmo_4_5.py::test_mix_to_audio[omni_runner0]",
+        ),
+        "exactly two executed MiniCPM-o offline tests",
+    ),
+    (
+        "ROCm · MiniCPM-o 4.5 Online Coverage",
+        30,
+        "20m",
+        "artifacts/rocm-minicpmo-45-online",
+        (
+            "tests/e2e/online_serving/test_minicpmo_4_5.py::test_text_to_text_001[async_chunk]",
+            "tests/e2e/online_serving/test_minicpmo_4_5.py::test_text_to_text_001[turn_async_chunk]",
+            "tests/e2e/online_serving/test_minicpmo_4_5.py::test_mix_to_text_audio_001[async_chunk]",
+        ),
+        "exactly three executed MiniCPM-o online tests",
+    ),
+    (
+        "ROCm · MiniCPM-o 4.5 Duplex Coverage",
+        45,
+        "35m",
+        "artifacts/rocm-minicpmo-45-duplex",
+        (
+            "tests/e2e/online_serving/test_minicpmo_4_5_duplex.py::"
+            "test_duplex_websocket_protocol_smoke[three-stage-single-gpu]",
+            "tests/e2e/online_serving/test_duplex_client_live.py::"
+            "test_duplex_client_live_session[three-stage-single-gpu]",
+        ),
+        "exactly two executed MiniCPM-o duplex tests",
+    ),
+)
+
+
+def test_minicpmo_ready_jobs_select_marked_core_model_nodes() -> None:
+    """READY owns the CUDA core_model cases, selected by an explicit ROCm mark."""
+    for label, timeout, command_timeout, artifact, nodes, junit_message in _MINICPMO_READY_JOBS:
+        step = _find_step(label, AMD_READY_PIPELINE)
+        command = "\n".join(step["commands"])
+
+        assert step["agent_pool"] == "mi300_1"
+        assert step["grade"] == "NonBlocking"
+        assert step["timeout_in_minutes"] == timeout
+        assert step["artifact_paths"] == [f"{artifact}/**/*"]
+        assert f"--kill-after=1m {command_timeout}" in command
+        assert _MINICPMO_READY_MARKER in command
+        assert "--run-level core_model" in command
+        assert "test_minicpmo_4_5_duplex_mrv2.py" not in command
+        assert "test_minicpmo_4_5_ready.json" not in command
+        assert "test_minicpmo_4_5_duplex_expansion.py" not in command
+        assert junit_message in command
+        for node in nodes:
+            assert command.count(node) == 2
+
+
+def test_minicpmo_ready_core_model_cases_declare_mi325() -> None:
+    """The selected cases carry MI325 so a one-card CUDA mark is not the selector."""
+    cases = {
+        "tests/e2e/offline_inference/test_minicpmo_4_5.py": (
+            "def test_text_to_text(",
+            "def test_mix_to_audio(",
+        ),
+        "tests/e2e/online_serving/test_minicpmo_4_5.py": (
+            "def test_text_to_text_001(",
+            "def test_mix_to_text_audio_001(",
+        ),
+        "tests/e2e/online_serving/test_minicpmo_4_5_duplex.py": ("def test_duplex_websocket_protocol_smoke(",),
+        "tests/e2e/online_serving/test_duplex_client_live.py": ("def test_duplex_client_live_session(",),
+    }
+    for path, functions in cases.items():
+        source = Path(path).read_text(encoding="utf-8")
+        for function_name in functions:
+            head, _, _ = source.partition(function_name)
+            assert '"rocm": "MI325"' in head[-300:]

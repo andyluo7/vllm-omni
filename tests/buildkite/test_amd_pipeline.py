@@ -2899,6 +2899,11 @@ def test_minicpmo_ready_jobs_select_marked_core_model_nodes() -> None:
         assert "test_minicpmo_4_5_ready.json" not in command
         assert "test_minicpmo_4_5_duplex_expansion.py" not in command
         assert junit_message in command
+        assert "--junitxml=" in command
+        assert "pytest.log" not in command
+        assert "pytest-summary.txt" not in command
+        assert "PIPESTATUS" not in command
+        assert "tee " not in command
         for node in nodes:
             assert command.count(node) == 2
 
@@ -2922,3 +2927,83 @@ def test_minicpmo_ready_core_model_cases_declare_mi325() -> None:
         for function_name in functions:
             head, _, _ = source.partition(function_name)
             assert '"rocm": "MI325"' in head[-300:]
+
+
+@pytest.mark.parametrize(
+    (
+        "step_label",
+        "expected_tests",
+        "expected_message",
+        "artifact_env",
+        "job_id_prefix",
+    ),
+    [
+        (
+            "ROCm · MiniCPM-o 4.5 Offline Coverage",
+            2,
+            "Expected exactly two executed MiniCPM-o offline tests",
+            "ROCM_MINICPMO_OFFLINE_ARTIFACT_DIR",
+            "minicpmo-ready-offline-guard",
+        ),
+        (
+            "ROCm · MiniCPM-o 4.5 Online Coverage",
+            3,
+            "Expected exactly three executed MiniCPM-o online tests",
+            "ROCM_MINICPMO_ONLINE_ARTIFACT_DIR",
+            "minicpmo-ready-online-guard",
+        ),
+        (
+            "ROCm · MiniCPM-o 4.5 Duplex Coverage",
+            2,
+            "Expected exactly two executed MiniCPM-o duplex tests",
+            "ROCM_MINICPMO_DUPLEX_ARTIFACT_DIR",
+            "minicpmo-ready-duplex-guard",
+        ),
+    ],
+    ids=("offline", "online", "duplex"),
+)
+@pytest.mark.parametrize(
+    (
+        "pytest_status",
+        "tests_override",
+        "skipped",
+        "timeout_status",
+        "expected_status",
+    ),
+    [
+        (0, None, 0, None, 0),
+        (0, None, 1, None, 5),
+        (0, 0, 0, None, 5),
+        (1, None, 0, None, 1),
+        (0, None, 0, 124, 124),
+    ],
+    ids=("pass", "skipped", "zero-tests", "pytest-failure", "timeout"),
+)
+def test_minicpmo_ready_executes_junit_guard_before_exit(
+    tmp_path: Path,
+    step_label: str,
+    expected_tests: int,
+    expected_message: str,
+    artifact_env: str,
+    job_id_prefix: str,
+    pytest_status: int,
+    tests_override: int | None,
+    skipped: int,
+    timeout_status: int | None,
+    expected_status: int,
+) -> None:
+    """MiniCPM READY jobs fail closed on the JUnit count before the step exits."""
+    _assert_nightly_junit_guard(
+        tmp_path,
+        pipeline_path=AMD_READY_PIPELINE,
+        step_label=step_label,
+        command_fragment='pytest -s -v "$${nodes[@]}"',
+        expected_message=expected_message,
+        artifact_env=artifact_env,
+        job_id_prefix=job_id_prefix,
+        pytest_status=pytest_status,
+        tests=expected_tests if tests_override is None else tests_override,
+        skipped=skipped,
+        timeout_status=timeout_status,
+        expected_status=expected_status,
+    )

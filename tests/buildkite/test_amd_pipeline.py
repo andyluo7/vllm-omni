@@ -2895,6 +2895,7 @@ def test_minicpmo_ready_jobs_select_marked_core_model_nodes() -> None:
         assert f"--kill-after=1m {command_timeout}" in command
         assert _MINICPMO_READY_MARKER in command
         assert "--run-level core_model" in command
+        assert command.count("--shard-id=0 --num-shards=1") == 2
         assert "test_minicpmo_4_5_duplex_mrv2.py" not in command
         assert "test_minicpmo_4_5_ready.json" not in command
         assert "test_minicpmo_4_5_duplex_expansion.py" not in command
